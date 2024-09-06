@@ -1,0 +1,11 @@
+{
+	"id": "spaced-writing-practice-obsidian",
+	"name": "Spaced writing practice",
+	"version": "0.1.0",
+	"minAppVersion": "1.6.7",
+	"description": "Apply spaced repetition to incrementally develop your notes.",
+	"author": "Zach Mueller",
+	"authorUrl": "https://notes.zach.nz",
+	"fundingUrl": "https://buymeacoffee.com/zachmueller",
+	"isDesktopOnly": false
+}

@@ -1,0 +1,20 @@
+# vscode
+.vscode 
+
+# Intellij
+*.iml
+.idea
+
+# npm
+node_modules
+
+# build
+main.js
+*.map
+
+# obsidian
+data.json
+.hotreload
+
+# Exclude macOS Finder (System Explorer) View States
+.DS_Store

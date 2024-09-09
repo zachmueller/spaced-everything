@@ -199,7 +199,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			const noteContexts = frontmatter?.['se-contexts'] || [];
 
 			// Check if any of the note's contexts match the active contexts
-			return noteContexts.some(noteContext => activeContexts.includes(noteContext));
+			return noteContexts.some((noteContext: string) => activeContexts.includes(noteContext));
 		});
 	}
 

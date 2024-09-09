@@ -11,7 +11,7 @@ interface ReviewOption {
 	score: number;
 }
 
-interface SpacedWritingPracticePluginSettings {
+interface SpacedEverythingPluginSettings {
 	defaultInterval: number;
 	defaultEaseFactor: number;
 	logFilePath: string;
@@ -23,7 +23,7 @@ interface SpacedWritingPracticePluginSettings {
 	reviewOptions: ReviewOption[];
 }
 
-const DEFAULT_SETTINGS: SpacedWritingPracticePluginSettings = {
+const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	defaultInterval: 1,
 	defaultEaseFactor: 2.5,
 	logFilePath: "",
@@ -64,10 +64,10 @@ class Suggester extends SuggestModal<string> {
 	}
 }
 
-export type { SpacedWritingPracticePluginSettings };
+export type { SpacedEverythingPluginSettings };
 
-export default class SpacedWritingPracticePlugin extends Plugin {
-	settings: SpacedWritingPracticePluginSettings;
+export default class SpacedEverythingPlugin extends Plugin {
+	settings: SpacedEverythingPluginSettings;
 	logger: Logger;
 
 	async onload() {
@@ -75,7 +75,7 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 		this.logger = new Logger(this.app, this.settings);
 		
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SpacedWritingPracticeSettingTab(this.app, this));
+		this.addSettingTab(new SpacedEverythingSettingTab(this.app, this));
 		
 		// Command to log the review outcome
 		this.addCommand({
@@ -86,12 +86,12 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 			}
 		});
 		
-		// Command to open the next review note
+		// Command to open the next review item
 		this.addCommand({
-			id: 'open-next-review-note',
-			name: 'Open next review note',
+			id: 'open-next-review-item',
+			name: 'Open next review item',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				this.openNextReviewNote(editor, view)
+				this.openNextReviewItem(editor, view)
 			}
 		});
 
@@ -113,7 +113,7 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 		}
 
 		const frontmatter = this.app.metadataCache.getFileCache(activeFile)?.frontmatter;
-		const currentContexts = frontmatter && frontmatter["swp-contexts"] ? frontmatter["swp-contexts"] : [];
+		const currentContexts = frontmatter && frontmatter["se-contexts"] ? frontmatter["se-contexts"] : [];
 
 		const choices = this.settings.contexts.map(context => {
 			const isSelected = currentContexts.includes(context.name);
@@ -131,7 +131,7 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 			}
 
 			await this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-				frontmatter["swp-contexts"] = updatedContexts;
+				frontmatter["se-contexts"] = updatedContexts;
 			});
 		}
 	}
@@ -146,7 +146,7 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 		// capture current timestamp
 		const now = new Date().toISOString().split('.')[0];
 
-		// check whether note already onboarded to SWP
+		// check whether note already onboarded to Spaced Everything
 		const frontmatter = this.app.metadataCache.getFileCache(activeFile)?.frontmatter;
 		const noteOnboarded = await this.isNoteOnboarded(activeFile, frontmatter);
 
@@ -157,12 +157,12 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 
 			if (!reviewResult) {
 				// exit if user presses Esc on the suggester
-				new Notice('SWP review cancelled by user');
+				new Notice('Spaced Everything review cancelled by user');
 				return;
 			}
 
 			if (reviewResult === 'Remove') {
-				await this.removeNoteFromSWP(activeFile, frontmatter);
+				await this.removeNoteFromSpacedEverything(activeFile, frontmatter);
 			} else {
 				const selectedOption = this.settings.reviewOptions.find((option) => option.name === reviewResult);
 				
@@ -182,25 +182,42 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption?.score ?? 0, now);
 			}
 		} else {
-			await this.onboardNoteToSWP(activeFile, frontmatter);
+			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
 		}
 	}
 
+	private filterNotesByContext(files: TFile[]): TFile[] {
+		if (this.settings.contexts.length === 0) {
+			// If no contexts are defined, return all files
+			return files;
+		}
+
+		const activeContexts = this.settings.contexts.filter(context => context.isActive).map(context => context.name);
+
+		return files.filter(file => {
+			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+			const noteContexts = frontmatter?.['se-contexts'] || [];
+
+			// Check if any of the note's contexts match the active contexts
+			return noteContexts.some(noteContext => activeContexts.includes(noteContext));
+		});
+	}
+
 	// Function to open the next note in the review queue
-	async openNextReviewNote(editor: Editor, view: MarkdownView) {
+	async openNextReviewItem(editor: Editor, view: MarkdownView) {
 		const vault = this.app.vault;
 		const files = vault.getMarkdownFiles();
 		
 		// Filter notes based on the review criteria
-		const filteredPages = files
+		const filteredPages = this.filterNotesByContext(files)
 			.filter(file => {
 				const metadata = this.app.metadataCache.getFileCache(file)?.frontmatter;
-				if (!metadata || metadata["swp-interval"] === undefined) return false;
+				if (!metadata || metadata["se-interval"] === undefined) return false;
 
 				const currentTime = Date.now();
-				const timeDiff = metadata["swp-interval"] * 24 * 60 * 60 * 1000;
-				const lastReviewed = metadata["swp-last-reviewed"]
-					? new Date(metadata["swp-last-reviewed"]).getTime()
+				const timeDiff = metadata["se-interval"] * 24 * 60 * 60 * 1000;
+				const lastReviewed = metadata["se-last-reviewed"]
+					? new Date(metadata["se-last-reviewed"]).getTime()
 					: 0;
 
 				const isDue = currentTime > (lastReviewed + timeDiff);
@@ -211,15 +228,15 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 				const aMetadata = this.app.metadataCache.getFileCache(a)?.frontmatter;
 				const bMetadata = this.app.metadataCache.getFileCache(b)?.frontmatter;
 
-				const aLastReviewed = aMetadata?.["swp-last-reviewed"]
-					? new Date(aMetadata["swp-last-reviewed"]).getTime()
+				const aLastReviewed = aMetadata?.["se-last-reviewed"]
+					? new Date(aMetadata["se-last-reviewed"]).getTime()
 					: 0;
-				const bLastReviewed = bMetadata?.["swp-last-reviewed"]
-					? new Date(bMetadata["swp-last-reviewed"]).getTime()
+				const bLastReviewed = bMetadata?.["se-last-reviewed"]
+					? new Date(bMetadata["se-last-reviewed"]).getTime()
 					: 0;
 
-				const aInterval = aMetadata?.["swp-interval"] * 24 * 60 * 60 * 1000;
-				const bInterval = bMetadata?.["swp-interval"] * 24 * 60 * 60 * 1000;
+				const aInterval = aMetadata?.["se-interval"] * 24 * 60 * 60 * 1000;
+				const bInterval = bMetadata?.["se-interval"] * 24 * 60 * 60 * 1000;
 
 				const aDueTime = aLastReviewed + (aInterval || 0);
 				const bDueTime = bLastReviewed + (bInterval || 0);
@@ -251,38 +268,38 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 	}
 
 	async isNoteOnboarded(file: TFile, frontmatter: any): Promise<boolean> {
-		return Object.keys(frontmatter || {}).includes('swp-interval');
+		return Object.keys(frontmatter || {}).includes('se-interval');
 	}
 
-	async onboardNoteToSWP(file: TFile, frontmatter: any): Promise<boolean> {
+	async onboardNoteToSpacedEverything(file: TFile, frontmatter: any): Promise<boolean> {
 		const now = new Date().toISOString().split('.')[0];
 		
 		// prompt user to select contexts
 		await this.toggleNoteContexts();
 		
-		// add standard SWP frontmatter properties and values
+		// add standard Spaced Everything frontmatter properties and values
 		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
-			frontmatter["swp-interval"] = this.settings.defaultInterval;
-			frontmatter["swp-last-reviewed"] = now;
-			frontmatter["swp-ease"] = this.settings.defaultEaseFactor;
+			frontmatter["se-interval"] = this.settings.defaultInterval;
+			frontmatter["se-last-reviewed"] = now;
+			frontmatter["se-ease"] = this.settings.defaultEaseFactor;
 		});
 		
 		if (this.settings.logOnboardAction) {
 			this.logger.log('onboarded', file, frontmatter);
 		}
 		
-		new Notice(`Onboarded note to SWP: ${file.basename}`);
+		new Notice(`Onboarded note to Spaced Everything: ${file.basename}`);
 		return true;
 	}
 
-	async removeNoteFromSWP(file: TFile, frontmatter: any): Promise<void> {
+	async removeNoteFromSpacedEverything(file: TFile, frontmatter: any): Promise<void> {
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			delete frontmatter['swp-interval'];
-			delete frontmatter['swp-ease'];
-			delete frontmatter['swp-last-reviewed'];
-			delete frontmatter['swp-contexts'];
+			delete frontmatter['se-interval'];
+			delete frontmatter['se-ease'];
+			delete frontmatter['se-last-reviewed'];
+			delete frontmatter['se-contexts'];
 		});
-		new Notice(`Removed note from SWP: ${file.basename}`);
+		new Notice(`Removed note from Spaced Everything: ${file.basename}`);
 		if (this.settings.logRemoveAction) {
 			this.logger.log('removed', file, frontmatter);
 		}
@@ -296,8 +313,8 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 			// Get the previous interval and ease factor from the frontmatter
-			prevInterval = Number(frontmatter['swp-interval'] || this.settings.defaultInterval);
-			prevEaseFactor = Number(frontmatter['swp-ease'] || this.settings.defaultEaseFactor);
+			prevInterval = Number(frontmatter['se-interval'] || this.settings.defaultInterval);
+			prevEaseFactor = Number(frontmatter['se-ease'] || this.settings.defaultEaseFactor);
 
 			// Calculate the new ease factor based on the review score
 			newEaseFactor = prevEaseFactor + (0.1 - (5 - reviewScore) * (0.08 + (5 - reviewScore) * 0.02));
@@ -313,9 +330,9 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 			}
 
 			// Update the frontmatter with the new interval and ease factor
-			frontmatter['swp-interval'] = newInterval;
-			frontmatter['swp-ease'] = newEaseFactor;
-			frontmatter['swp-last-reviewed'] = now;
+			frontmatter['se-interval'] = newInterval;
+			frontmatter['se-ease'] = newEaseFactor;
+			frontmatter['se-last-reviewed'] = now;
 
 			if (this.settings.logFilePath) {
 				this.logger.log('review', file, frontmatter, reviewScore, newInterval, newEaseFactor);
@@ -341,10 +358,10 @@ export default class SpacedWritingPracticePlugin extends Plugin {
 	}
 }
 
-class SpacedWritingPracticeSettingTab extends PluginSettingTab {
-	plugin: SpacedWritingPracticePlugin;
+class SpacedEverythingSettingTab extends PluginSettingTab {
+	plugin: SpacedEverythingPlugin;
 
-	constructor(app: App, plugin: SpacedWritingPracticePlugin) {
+	constructor(app: App, plugin: SpacedEverythingPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -394,7 +411,7 @@ class SpacedWritingPracticeSettingTab extends PluginSettingTab {
 
 		// Add button to create a new review option
 		new Setting(reviewOptionsSettingDiv)
-			.setDesc('Customize the review options and scores to use in your spaced writing practice. The numeric value sets the review score, following the SuperMemo-2.0 spacing algorithm. Review scores must be a number from 0 to 5.')
+			.setDesc('Customize the review options and scores to use in your spaced everything practice. The numeric value sets the review score, following the SuperMemo-2.0 spacing algorithm. Review scores must be a number from 0 to 5.')
 
 		// Render existing review options
 		this.plugin.settings.reviewOptions.forEach((option, index) => {
@@ -422,7 +439,7 @@ class SpacedWritingPracticeSettingTab extends PluginSettingTab {
 
 		// Add button to create a new context
 		new Setting(contextsSettingDiv)
-			.setDesc('Define and manage the contexts you want to use for categorizing notes in your spaced writing practice. You can toggle the active state of each context to control which notes will be included in the review queue. Note: leaving this empty will ignore the use of contexts in the review system (i.e., all notes will be in scope for reviews).')
+			.setDesc('Define and manage the contexts you want to use for categorizing notes in your spaced everything practice. You can toggle the active state of each context to control which notes will be included in the review queue. Note: leaving this empty will ignore the use of contexts in the review system (i.e., all notes will be in scope for reviews).')
 		
 		// Render existing contexts
 		this.plugin.settings.contexts.forEach((context, index) => {
@@ -446,8 +463,8 @@ class SpacedWritingPracticeSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName('Logging').setHeading();
 		
 		new Setting(containerEl)
-			.setName('Log spaced writing practice activity')
-			.setDesc('Choose the file path where SWP logs are stored. Leave blank to not capture logs. Note: output data format is JSONL (i.e., `.jsonl` file format recommended).')
+			.setName('Log spaced everything practice activity')
+			.setDesc('Choose the file path where Spaced Everything logs are stored. Leave blank to not capture logs. Note: output data format is JSONL (i.e., `.jsonl` file format recommended).')
 			.addText(text => text
 				.setValue(this.plugin.settings.logFilePath)
 				.onChange(async (value) => {
@@ -458,8 +475,8 @@ class SpacedWritingPracticeSettingTab extends PluginSettingTab {
 			);
 		
 		new Setting(containerEl)
-			.setName('Log action: note onboarded to SWP')
-			.setDesc('Whether to log the action of onboarding a new note to SWP')
+			.setName('Log action: note onboarded to Spaced Everything')
+			.setDesc('Whether to log the action of onboarding a new note to Spaced Everything')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.logOnboardAction)
 				.onChange(async (value) => {
@@ -468,8 +485,8 @@ class SpacedWritingPracticeSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Log action: note removed from SWP')
-			.setDesc('Whether to log the action of removing a note from SWP')
+			.setName('Log action: note removed from Spaced Everything')
+			.setDesc('Whether to log the action of removing a note from Spaced Everything')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.logRemoveAction)
 				.onChange(async (value) => {
@@ -489,7 +506,7 @@ class SpacedWritingPracticeSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Log frontmatter properties')
-			.setDesc('Provide a list (one per line) of frontmatter properties you would like to include in the SWP logs')
+			.setDesc('Provide a list (one per line) of frontmatter properties you would like to include in the Spaced Everything logs')
 			.addTextArea(textArea => {
 				const properties = this.plugin.settings.logFrontMatterProperties ?? [];
 				const propertyStr = properties.join('\n');

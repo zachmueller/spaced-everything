@@ -8,9 +8,6 @@ After re-reading various of Andy Matuschak's notes, I want to implement a few ad
 
 Also, some minor changes of existing code:
 - Review full code and documentation for terminology and identify better names to suit the broader scope (e.g., "review queue"). Probably toss all of this into a Glossary doc.
-- Rename the plugin in all relevant places (e.g., in the code, GitHub repo, etc)
-- Change frontmatter property prefix from `swp-` to...something?
-	- `se-` seems more likely to have collisions with other plugin prefixes, I think?
 - Restructure some of the plugin settings variables to ensure it's better suited for my long term plans of expanding into more customization
 
 ## Later on

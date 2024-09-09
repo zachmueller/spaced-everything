@@ -1,9 +1,9 @@
 {
-	"id": "spaced-writing-practice",
-	"name": "Spaced writing practice",
-	"version": "1.0.1",
+	"id": "spaced-everything",
+	"name": "Spaced everything",
+	"version": "1.0.3",
 	"minAppVersion": "1.6.7",
-	"description": "Apply spaced repetition to incrementally develop your notes.",
+	"description": "Apply spaced repetition algorithms to everything in your vault.",
 	"author": "Zach Mueller",
 	"authorUrl": "https://notes.zach.nz",
 	"fundingUrl": "https://buymeacoffee.com/zachmueller",

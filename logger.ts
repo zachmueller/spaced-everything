@@ -1,12 +1,12 @@
 import { TFile, App } from 'obsidian';
-import { SpacedWritingPracticePluginSettings } from './main';
+import { SpacedEverythingPluginSettings } from './main';
 
 export class Logger {
 	private app: App;
-	private settings: SpacedWritingPracticePluginSettings;
+	private settings: SpacedEverythingPluginSettings;
 	private logFilePath: string;
 
-	constructor(app: App, settings: SpacedWritingPracticePluginSettings) {
+	constructor(app: App, settings: SpacedEverythingPluginSettings) {
 		this.app = app;
 		this.settings = settings;
 		this.logFilePath = settings.logFilePath;

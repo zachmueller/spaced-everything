@@ -22,8 +22,6 @@ By default, all notes are treated as one large queue of notes to review. However
 
 You can create and remove SWP contexts from within the settings. You may also toggle which contexts are "active" (i.e., only notes matching an active context are considered when going through the review queue). 
 
-TODO::I don't know whether I actually implemented the filtering when running the command to pull up next note in the queue to take into account the contexts::
-
 ### Onboard individual notes
 
 Only notes you actively choose to review to onboard are considered for the spaced writing practice review queue. When running the "Log review outcome" command on a note not yet onboarded, it will onboard the note. When conducting the review (using that same command), you may remove any individual note at any time.

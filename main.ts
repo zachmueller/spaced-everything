@@ -4,6 +4,7 @@ import { Logger } from './logger';
 interface Context {
 	name: string;
 	isActive: boolean;
+	spacingMethodName: string;
 }
 
 interface ReviewOption {
@@ -11,31 +12,46 @@ interface ReviewOption {
 	score: number;
 }
 
-interface SpacedEverythingPluginSettings {
+interface SpacingMethod {
+	name: string;
+	spacingAlgorithm: string;
+	customScriptFileName: string;
+	reviewOptions: ReviewOption[];
 	defaultInterval: number;
-	defaultEaseFactor: number;
+	defaultEaseFactor?: number; // optional because may only be relevant to SM-2
+}
+
+interface SpacedEverythingPluginSettings {
 	logFilePath: string;
 	logOnboardAction: boolean;
 	logRemoveAction: boolean;
 	logNoteTitle: boolean;
 	logFrontMatterProperties: string[];
 	contexts: Context[];
-	reviewOptions: ReviewOption[];
+	spacingMethods: SpacingMethod[];
+	// TODO::add things related to "capture thought" functionality::
 }
 
 const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
-	defaultInterval: 1,
-	defaultEaseFactor: 2.5,
-	logFilePath: "",
+	logFilePath: "", // defaults to no logging
 	logOnboardAction: true,
 	logRemoveAction: true,
 	logNoteTitle: true,
 	logFrontMatterProperties: [],
 	contexts: [],
-	reviewOptions: [
-		{ name: 'Fruitful', score: 1 },
-		{ name: 'Ignore', score: 3 },
-		{ name: 'Unfruitful', score: 5 },
+	spacingMethods: [
+		{
+			name: "SuperMemo 2.0 (Simplified)",
+			spacingAlgorithm: "SuperMemo2.0",
+			customScriptFileName: "",
+			reviewOptions: [
+				{ name: 'Fruitful', score: 1 },
+				{ name: 'Ignore', score: 3 },
+				{ name: 'Unfruitful', score: 5 },
+			],
+			defaultInterval: 1,
+			defaultEaseFactor: 2.5,
+		},
 	],
 }
 
@@ -151,8 +167,13 @@ export default class SpacedEverythingPlugin extends Plugin {
 		const noteOnboarded = await this.isNoteOnboarded(activeFile, frontmatter);
 
 		if (noteOnboarded) {
-			// collect review result
-			const reviewOptions = [...this.settings.reviewOptions.map((option) => option.name), 'Remove'];
+			const activeSpacingMethod = this.getActiveSpacingMethod(activeFile, frontmatter);
+			if (!activeSpacingMethod) {
+				new Notice('Error: No active spacing method found for this note.');
+				return;
+			}
+
+			const reviewOptions = [...activeSpacingMethod.reviewOptions.map((option) => option.name), 'Remove'];
 			const reviewResult = await this.suggester(reviewOptions, 'Select review outcome:');
 
 			if (!reviewResult) {
@@ -164,7 +185,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			if (reviewResult === 'Remove') {
 				await this.removeNoteFromSpacedEverything(activeFile, frontmatter);
 			} else {
-				const selectedOption = this.settings.reviewOptions.find((option) => option.name === reviewResult);
+				const selectedOption = activeSpacingMethod.reviewOptions.find((option) => option.name === reviewResult);
 				
 				// check whether valid option selected
 				if (!selectedOption) {
@@ -179,7 +200,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 				}
 				
 				// perform action to update the interval
-				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption?.score ?? 0, now);
+				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption.score, now);
 			}
 		} else {
 			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
@@ -192,18 +213,27 @@ export default class SpacedEverythingPlugin extends Plugin {
 			return files;
 		}
 
-		const activeContexts = this.settings.contexts.filter(context => context.isActive).map(context => context.name);
+		const activeContexts = this.settings.contexts
+			.filter(context => context.isActive)
+			.map(context => context.name);
 
 		return files.filter(file => {
 			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 			const noteContexts = frontmatter?.['se-contexts'] || [];
 
 			// Check if any of the note's contexts match the active contexts
-			return noteContexts.some((noteContext: string) => activeContexts.includes(noteContext));
+			const hasActiveContext = noteContexts.some((noteContext: string) => activeContexts.includes(noteContext));
+
+			// If no active context is found, use the first spacing method
+			const activeSpacingMethod = hasActiveContext
+				? this.settings.spacingMethods.find(method => activeContexts.some(context => context === method.name))
+				: this.settings.spacingMethods[0];
+
+			return activeSpacingMethod !== undefined;
 		});
 	}
 
-	// Function to open the next note in the review queue
+	// Function to open the next item in the review queue
 	async openNextReviewItem(editor: Editor, view: MarkdownView) {
 		const vault = this.app.vault;
 		const files = vault.getMarkdownFiles();
@@ -277,11 +307,13 @@ export default class SpacedEverythingPlugin extends Plugin {
 		// prompt user to select contexts
 		await this.toggleNoteContexts();
 		
+		const activeSpacingMethod = this.getActiveSpacingMethod(file, frontmatter);
+
 		// add standard Spaced Everything frontmatter properties and values
 		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
-			frontmatter["se-interval"] = this.settings.defaultInterval;
+			frontmatter["se-interval"] = activeSpacingMethod?.defaultInterval || 1;
 			frontmatter["se-last-reviewed"] = now;
-			frontmatter["se-ease"] = this.settings.defaultEaseFactor;
+			frontmatter["se-ease"] = activeSpacingMethod?.defaultEaseFactor; // TODO::make sure this is optional
 		});
 		
 		if (this.settings.logOnboardAction) {
@@ -306,15 +338,17 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, now: string): Promise<{ newInterval: number; newEaseFactor: number; }> {
-		let prevInterval = this.settings.defaultInterval;
-		let prevEaseFactor = this.settings.defaultEaseFactor;
+		let prevInterval = 1;
+		let prevEaseFactor = 2.5;
 		let newInterval = 0;
 		let newEaseFactor = 0;
 
+		const activeSpacingMethod = this.getActiveSpacingMethod(file, frontmatter);
+
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 			// Get the previous interval and ease factor from the frontmatter
-			prevInterval = Number(frontmatter['se-interval'] || this.settings.defaultInterval);
-			prevEaseFactor = Number(frontmatter['se-ease'] || this.settings.defaultEaseFactor);
+			prevInterval = Number(frontmatter['se-interval'] || activeSpacingMethod?.defaultInterval || 1);
+			prevEaseFactor = Number(frontmatter['se-ease'] || activeSpacingMethod?.defaultEaseFactor || 2.5);
 
 			// Calculate the new ease factor based on the review score
 			newEaseFactor = prevEaseFactor + (0.1 - (5 - reviewScore) * (0.08 + (5 - reviewScore) * 0.02));
@@ -345,6 +379,29 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return { newInterval, newEaseFactor };
 	}
 
+	getActiveSpacingMethod(file: TFile, frontmatter: any): SpacingMethod | undefined {
+		const noteContexts = frontmatter?.['se-contexts'] || [];
+
+		// If no contexts are defined for the note, use the first spacing method
+		if (noteContexts.length === 0) {
+			return this.settings.spacingMethods[0];
+		}
+
+		// Find the first context that matches an active context in the settings
+		const activeContext = this.settings.contexts.find(
+			(context) => context.isActive && noteContexts.includes(context.name)
+		);
+
+		// If no active context is found, use the first spacing method
+		if (!activeContext) {
+			return this.settings.spacingMethods[0];
+		}
+
+		// Use the spacing method associated with the active context
+		const spacingMethodName = activeContext.spacingMethodName;
+		return this.settings.spacingMethods.find((method) => method.name === spacingMethodName);
+	}
+
 	onunload() {
 		
 	}
@@ -371,71 +428,43 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl)
-			.setName('Default interval')
-			.setDesc('The default interval length, in days')
-			.addText(text => text
-				.setValue(this.plugin.settings.defaultInterval.toString())
-				.onChange(async (value) => {
-					const numericValue = parseFloat(value);
-					if (!isNaN(numericValue)) {
-						this.plugin.settings.defaultInterval = numericValue;
-						await this.plugin.saveSettings();
-					} else {
-						new Notice('Default Interval must be a number.');
-					}
-				})
-			);
+		new Setting(containerEl).setName('Spacing Methods').setHeading();
+		const spacingMethodsSettingDiv = containerEl.createDiv();
+		const spacingMethodsDiv = containerEl.createDiv();
+		const addSpacingMethodDiv = containerEl.createDiv();
 
-		new Setting(containerEl)
-			.setName('Default ease factor')
-			.setDesc('The default ease factor')
-			.addText(text => text
-				.setValue(this.plugin.settings.defaultEaseFactor.toString())
-				.onChange(async (value) => {
-					const numericValue = parseFloat(value);
-					if (!isNaN(numericValue)) {
-						this.plugin.settings.defaultEaseFactor = numericValue;
-						await this.plugin.saveSettings();
-					} else {
-						new Notice('Default ease factor must be a number.');
-					}
-				})
-			);
+		new Setting(spacingMethodsSettingDiv)
+			.setDesc('Define and manage the spacing methods you want to use for your spaced everything practice. You can create multiple spacing methods and map them to different contexts.');
 
-		// review options
-		new Setting(containerEl).setName('Review options').setHeading();
-		const reviewOptionsSettingDiv = containerEl.createDiv();
-		const reviewOptionsDiv = containerEl.createDiv();
-		const addReviewOptionsDiv = containerEl.createDiv();
-
-		// Add button to create a new review option
-		new Setting(reviewOptionsSettingDiv)
-			.setDesc('Customize the review options and scores to use in your spaced everything practice. The numeric value sets the review score, following the SuperMemo-2.0 spacing algorithm. Review scores must be a number from 0 to 5.')
-
-		// Render existing review options
-		this.plugin.settings.reviewOptions.forEach((option, index) => {
-			this.renderReviewOptionSetting(reviewOptionsDiv, option, index);
+		this.plugin.settings.spacingMethods.forEach((spacingMethod, index) => {
+			this.renderSpacingMethodSetting(spacingMethodsDiv, spacingMethod, index);
 		});
 
-		new Setting(addReviewOptionsDiv)
+		new Setting(addSpacingMethodDiv)
 			.addButton((button) =>
 				button
 				.setButtonText('+')
 				.setIcon('plus')
 				.onClick(async () => {
-					const newOption = { name: '', score: 0 };
-					this.plugin.settings.reviewOptions.push(newOption);
+					const newSpacingMethod: SpacingMethod = {
+						name: '',
+						spacingAlgorithm: 'SuperMemo2.0',
+						customScriptFileName: '',
+						reviewOptions: [],
+						defaultInterval: 1,
+						defaultEaseFactor: 2.5,
+					};
+					this.plugin.settings.spacingMethods.push(newSpacingMethod);
 					await this.plugin.saveSettings();
-					this.renderReviewOptionSetting(reviewOptionsDiv, newOption, this.plugin.settings.reviewOptions.length - 1);
+					this.renderSpacingMethodSetting(spacingMethodsDiv, newSpacingMethod, this.plugin.settings.spacingMethods.length - 1);
 				})
 			);
 
 		// review contexts
 		new Setting(containerEl).setName('Contexts').setHeading();
 		const contextsSettingDiv = containerEl.createDiv();
-		const contextsDiv = containerEl.createDiv();
 		const addContextDiv = containerEl.createDiv();
+		const contextsDiv = containerEl.createDiv();
 
 		// Add button to create a new context
 		new Setting(contextsSettingDiv)
@@ -452,7 +481,11 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setButtonText('+')
 				.setIcon('plus')
 				.onClick(async () => {
-					const newContext = { name: '', isActive: false };
+					const newContext: Context = {
+						name: '',
+						isActive: false,
+						spacingMethodName: this.plugin.settings.spacingMethods[0].name, // Set the default spacing method name
+					};
 					this.plugin.settings.contexts.push(newContext);
 					await this.plugin.saveSettings();
 					this.renderContextSetting(contextsDiv, newContext, this.plugin.settings.contexts.length - 1);
@@ -521,6 +554,105 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 			});
 	}
 
+	renderSpacingMethodSetting(containerEl: HTMLElement, spacingMethod: SpacingMethod, index: number) {
+		const settingEl = containerEl.createDiv('spacing-method-settings-items');
+
+		new Setting(settingEl)
+			.setName(`(${index + 1})`)
+			.addText((text) =>
+				text
+				.setPlaceholder('Name')
+				.setValue(spacingMethod.name)
+				.onChange(async (value) => {
+					spacingMethod.name = value;
+					await this.plugin.saveSettings();
+				})
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+				.addOptions({
+					'SuperMemo2.0': 'SuperMemo 2.0',
+					'Custom': 'Custom Script',
+				})
+				.setValue(spacingMethod.spacingAlgorithm)
+				.onChange(async (value) => {
+					spacingMethod.spacingAlgorithm = value;
+					await this.plugin.saveSettings();
+				})
+			)
+			.addText((text) =>
+				text
+				.setPlaceholder('Custom Script File Name')
+				.setValue(spacingMethod.customScriptFileName)
+				.onChange(async (value) => {
+					spacingMethod.customScriptFileName = value;
+					await this.plugin.saveSettings();
+				})
+				.setDisabled(spacingMethod.spacingAlgorithm !== 'Custom')
+			)
+			.addText((text) =>
+				text
+				.setPlaceholder('Default Interval')
+				.setValue(spacingMethod.defaultInterval.toString())
+				.onChange(async (value) => {
+					const numericValue = parseFloat(value);
+					if (!isNaN(numericValue)) {
+						spacingMethod.defaultInterval = numericValue;
+						await this.plugin.saveSettings();
+					} else {
+						new Notice('Default Interval must be a number.');
+					}
+				})
+			)
+			.addText((text) =>
+				text
+				.setPlaceholder('Default Ease Factor')
+				.setValue(spacingMethod.defaultEaseFactor?.toString() || '')
+				.onChange(async (value) => {
+					const numericValue = parseFloat(value);
+					if (!isNaN(numericValue)) {
+						spacingMethod.defaultEaseFactor = numericValue;
+						await this.plugin.saveSettings();
+					} else {
+						new Notice('Default Ease Factor must be a number.');
+					}
+				})
+				.setDisabled(spacingMethod.spacingAlgorithm !== 'SuperMemo2.0')
+			);
+
+		// Render review options for the spacing method
+		const reviewOptionsDiv = settingEl.createDiv();
+		spacingMethod.reviewOptions.forEach((option, optionIndex) => {
+			this.renderReviewOptionSetting(reviewOptionsDiv, option, optionIndex, index);
+		});
+
+		const addReviewOptionDiv = settingEl.createDiv();
+		new Setting(addReviewOptionDiv)
+			.addButton((button) =>
+				button
+				.setButtonText('+')
+				.setIcon('plus')
+				.onClick(async () => {
+					const newOption = { name: '', score: 0 };
+					spacingMethod.reviewOptions.push(newOption);
+					await this.plugin.saveSettings();
+					this.renderReviewOptionSetting(reviewOptionsDiv, newOption, spacingMethod.reviewOptions.length - 1, index);
+				})
+			);
+
+		// Add delete button for the spacing method
+		new Setting(settingEl)
+			.addExtraButton((cb) => {
+				cb.setIcon('cross')
+				.setTooltip('Delete')
+				.onClick(async () => {
+					this.plugin.settings.spacingMethods.splice(index, 1);
+					await this.plugin.saveSettings();
+					this.display(); // Re-render the settings tab
+				});
+			});
+	}
+
 	renderContextSetting(containerEl: HTMLElement, context: Context, index: number) {
 		const settingEl = containerEl.createDiv('context-settings-items');
 
@@ -542,9 +674,20 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				})
 			)
+			.addDropdown((dropdown) =>
+				dropdown
+				.addOptions(Object.fromEntries(
+					this.plugin.settings.spacingMethods.map((method) => [method.name, method.name])
+				))
+				.setValue(context.spacingMethodName)
+				.onChange(async (value) => {
+					context.spacingMethodName = value;
+					await this.plugin.saveSettings();
+				})
+			)
 			.addExtraButton((cb) => {
-				cb.setIcon("cross")
-				.setTooltip("Delete")
+				cb.setIcon('cross')
+				.setTooltip('Delete')
 				.onClick(async () => {
 					this.plugin.settings.contexts.splice(index, 1);
 					await this.plugin.saveSettings();
@@ -553,18 +696,18 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 			});
 	}
 
-	renderReviewOptionSetting(containerEl: HTMLElement, option: ReviewOption, index: number) {
+	renderReviewOptionSetting(containerEl: HTMLElement, option: ReviewOption, optionIndex: number, spacingMethodIndex: number) {
 		const settingEl = containerEl.createDiv('review-option-settings-items');
 
 		new Setting(settingEl)
-			.setName(`(${index + 1})`)
+			.setName(`(${optionIndex + 1})`)
 			.addText((text) =>
 				text
 				.setPlaceholder('Name')
 				.setValue(option.name)
 				.onChange(async (value) => {
-				option.name = value;
-				await this.plugin.saveSettings();
+					option.name = value;
+					await this.plugin.saveSettings();
 				})
 			)
 			.addText((text) =>
@@ -585,7 +728,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				cb.setIcon('cross')
 				.setTooltip('Delete')
 				.onClick(async () => {
-					this.plugin.settings.reviewOptions.splice(index, 1);
+					this.plugin.settings.spacingMethods[spacingMethodIndex].reviewOptions.splice(optionIndex, 1);
 					await this.plugin.saveSettings();
 					this.display(); // Re-render the settings tab
 				});

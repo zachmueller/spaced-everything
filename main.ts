@@ -206,7 +206,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
 		}
 	}
-
+/*
 	private filterNotesByContext(files: TFile[]): TFile[] {
 		if (this.settings.contexts.length === 0) {
 			// If no contexts are defined, return all files
@@ -230,6 +230,39 @@ export default class SpacedEverythingPlugin extends Plugin {
 				: this.settings.spacingMethods[0];
 
 			return activeSpacingMethod !== undefined;
+		});
+	}
+*/
+	private filterNotesByContext(files: TFile[]): TFile[] {
+		const activeContexts = this.settings.contexts.filter(context => context.isActive).map(context => context.name);
+
+		// Case 1: No defined at all contexts
+		if (this.settings.contexts.length === 0) {
+			// If no contexts are defined or all are inactive, return all files
+			return files;
+		}
+
+		// Case 2: All contexts are inactive
+		if (this.settings.contexts.length > 0 && activeContexts.length === 0) {
+			// If all contexts are defined but none are active, return no files
+			new Notice('Spaced everything: No active contexts');
+			return [];
+		}
+
+		return files.filter(file => {
+			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+			const noteContexts = frontmatter?.['se-contexts'] || [];
+
+			// Case 3: If noteContexts is empty, always include
+			if (noteContexts.length === 0) {
+				return true;
+			}
+
+			// Case 4: Some contexts are active
+			const hasActiveContext = noteContexts.some((noteContext: string) => activeContexts.includes(noteContext));
+
+			// If any of the note's contexts match the active contexts, include it
+			return hasActiveContext;
 		});
 	}
 

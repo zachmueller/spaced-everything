@@ -556,9 +556,18 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 
 	renderSpacingMethodSetting(containerEl: HTMLElement, spacingMethod: SpacingMethod, index: number) {
 		const settingEl = containerEl.createDiv('spacing-method-settings-items');
+		const settingHeader = settingEl.createDiv('spacing-method-header');
+		const settingBody = settingEl.createDiv('spacing-method-body');
 
-		new Setting(settingEl)
-			.setName(`(${index + 1})`)
+		new Setting(settingHeader)
+			.setName(`Spacing Method - #${index + 1}`)
+			.setDesc('Configure the settings for this spacing method.');
+
+		const generalSettingsDiv = settingBody.createDiv('general-settings');
+		
+		new Setting(generalSettingsDiv)
+			.setName('Name')
+			.setDesc('Enter a name for this spacing method')
 			.addText((text) =>
 				text
 				.setPlaceholder('Name')
@@ -567,7 +576,11 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 					spacingMethod.name = value;
 					await this.plugin.saveSettings();
 				})
-			)
+			);
+
+		new Setting(generalSettingsDiv)
+			.setName('Spacing algorithm')
+			.setDesc('Select which spacing algorithm approach to apply')
 			.addDropdown((dropdown) =>
 				dropdown
 				.addOptions({
@@ -579,7 +592,11 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 					spacingMethod.spacingAlgorithm = value;
 					await this.plugin.saveSettings();
 				})
-			)
+			);
+
+		new Setting(generalSettingsDiv)
+			.setName('Custom script')
+			.setDesc('>>>NOT YET IMPLEMENTED<<< —— Input the location of your custom script file that implements a spacing algorithm')
 			.addText((text) =>
 				text
 				.setPlaceholder('Custom Script File Name')
@@ -590,9 +607,13 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				})
 				.setDisabled(spacingMethod.spacingAlgorithm !== 'Custom')
 			)
+
+		new Setting(generalSettingsDiv)
+			.setName('Default interval')
+			.setDesc('The default interval length, in days')
 			.addText((text) =>
 				text
-				.setPlaceholder('Default Interval')
+				.setPlaceholder('Default interval')
 				.setValue(spacingMethod.defaultInterval.toString())
 				.onChange(async (value) => {
 					const numericValue = parseFloat(value);
@@ -603,10 +624,14 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 						new Notice('Default Interval must be a number.');
 					}
 				})
-			)
+			);
+
+		new Setting(generalSettingsDiv)
+			.setName('Default ease factor')
+			.setDesc('The default ease factor')
 			.addText((text) =>
 				text
-				.setPlaceholder('Default Ease Factor')
+				.setPlaceholder('Default ease factor')
 				.setValue(spacingMethod.defaultEaseFactor?.toString() || '')
 				.onChange(async (value) => {
 					const numericValue = parseFloat(value);
@@ -621,17 +646,19 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 			);
 
 		// Render review options for the spacing method
-		const reviewOptionsDiv = settingEl.createDiv();
-		spacingMethod.reviewOptions.forEach((option, optionIndex) => {
-			this.renderReviewOptionSetting(reviewOptionsDiv, option, optionIndex, index);
-		});
+		const reviewOptionsDiv = settingBody.createDiv('review-options');
+		new Setting(reviewOptionsDiv)
+			.setHeading()
+			.setName('Review Options')
+			.setDesc('Customize the review options and scores to use in this spacing method. For the SuperMemo-2.0 spacing algorithm, review scores must be a number from 0 to 5.');
 
-		const addReviewOptionDiv = settingEl.createDiv();
+		const addReviewOptionDiv = reviewOptionsDiv.createDiv();
 		new Setting(addReviewOptionDiv)
 			.addButton((button) =>
 				button
 				.setButtonText('+')
 				.setIcon('plus')
+				.setTooltip('Add a new review option')
 				.onClick(async () => {
 					const newOption = { name: '', score: 0 };
 					spacingMethod.reviewOptions.push(newOption);
@@ -639,6 +666,10 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 					this.renderReviewOptionSetting(reviewOptionsDiv, newOption, spacingMethod.reviewOptions.length - 1, index);
 				})
 			);
+
+		spacingMethod.reviewOptions.forEach((option, optionIndex) => {
+			this.renderReviewOptionSetting(reviewOptionsDiv, option, optionIndex, index);
+		});
 
 		// Add delete button for the spacing method
 		new Setting(settingEl)

@@ -1,7 +1,7 @@
 {
 	"id": "spaced-everything",
 	"name": "Spaced everything",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"minAppVersion": "1.6.7",
 	"description": "Apply spaced repetition algorithms to everything in your vault.",
 	"author": "Zach Mueller",

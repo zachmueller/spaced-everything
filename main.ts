@@ -475,7 +475,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		// Add button to create a new context
 		new Setting(contextsSettingDiv)
-			.setDesc('Define and manage the contexts you want to use for categorizing notes in your spaced everything practice. You can toggle the active state of each context to control which notes will be included in the review queue. Note: leaving this empty will ignore the use of contexts in the review system (i.e., all notes will be in scope for reviews).')
+			.setDesc('Define and manage the contexts you want to use for categorizing notes in your spaced everything practice. You can toggle the active state of each context to control which notes will be included in the review queue. Note: leaving this empty will ignore the use of contexts in the review system (i.e., all notes onboarded to Spaced Everything are in scope for reviews).')
 		
 		// Render existing contexts
 		this.plugin.settings.contexts.forEach((context, index) => {
@@ -483,6 +483,8 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(addContextDiv)
+			// TODO::make this render in a better location to make it
+			// more clearly distinct from review options expansion::
 			.addButton((button) =>
 				button
 				.setButtonText('+')
@@ -547,6 +549,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Log frontmatter properties')
 			.setDesc('Provide a list (one per line) of frontmatter properties you would like to include in the Spaced Everything logs')
+			// TODO::enable input to "select all" frontmatter properties::
 			.addTextArea(textArea => {
 				const properties = this.plugin.settings.logFrontMatterProperties ?? [];
 				const propertyStr = properties.join('\n');
@@ -580,8 +583,28 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setPlaceholder('Name')
 				.setValue(spacingMethod.name)
 				.onChange(async (value) => {
+					// TODO::ensure this does not get left blank (leads to confusing 
+					// settings dropdown for contexts below if so)::
 					spacingMethod.name = value;
 					await this.plugin.saveSettings();
+				})
+			);
+
+		new Setting(generalSettingsDiv)
+			.setName('Default interval')
+			.setDesc('The default interval length, in days')
+			.addText((text) =>
+				text
+				.setPlaceholder('Default interval')
+				.setValue(spacingMethod.defaultInterval.toString())
+				.onChange(async (value) => {
+					const numericValue = parseFloat(value);
+					if (!isNaN(numericValue)) {
+						spacingMethod.defaultInterval = numericValue;
+						await this.plugin.saveSettings();
+					} else {
+						new Notice('Default Interval must be a number.');
+					}
 				})
 			);
 
@@ -604,11 +627,13 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		new Setting(generalSettingsDiv)
 			.setName('Custom script')
 			.setDesc('>>>NOT YET IMPLEMENTED<<< —— Input the location of your custom script file that implements a spacing algorithm')
+			// TODO::hide unless 'Custom Script' option set above::
 			.addText((text) =>
 				text
 				.setPlaceholder('Custom Script File Name')
 				.setValue(spacingMethod.customScriptFileName)
 				.onChange(async (value) => {
+					// TODO::implement helper stuff for auto-completing paths/filenames::
 					spacingMethod.customScriptFileName = value;
 					await this.plugin.saveSettings();
 				})
@@ -616,26 +641,9 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 			)
 
 		new Setting(generalSettingsDiv)
-			.setName('Default interval')
-			.setDesc('The default interval length, in days')
-			.addText((text) =>
-				text
-				.setPlaceholder('Default interval')
-				.setValue(spacingMethod.defaultInterval.toString())
-				.onChange(async (value) => {
-					const numericValue = parseFloat(value);
-					if (!isNaN(numericValue)) {
-						spacingMethod.defaultInterval = numericValue;
-						await this.plugin.saveSettings();
-					} else {
-						new Notice('Default Interval must be a number.');
-					}
-				})
-			);
-
-		new Setting(generalSettingsDiv)
 			.setName('Default ease factor')
 			.setDesc('The default ease factor')
+			// TODO::hide unless SuperMemo 2.0 algorithm set above::
 			.addText((text) =>
 				text
 				.setPlaceholder('Default ease factor')
@@ -680,6 +688,8 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		// Add delete button for the spacing method
 		new Setting(settingEl)
+			// TODO::make this render in a better location to make it
+			// more clearly distinct from review options expansion::
 			.addExtraButton((cb) => {
 				cb.setIcon('cross')
 				.setTooltip('Delete')

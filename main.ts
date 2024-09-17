@@ -206,33 +206,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
 		}
 	}
-/*
-	private filterNotesByContext(files: TFile[]): TFile[] {
-		if (this.settings.contexts.length === 0) {
-			// If no contexts are defined, return all files
-			return files;
-		}
 
-		const activeContexts = this.settings.contexts
-			.filter(context => context.isActive)
-			.map(context => context.name);
-
-		return files.filter(file => {
-			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
-			const noteContexts = frontmatter?.['se-contexts'] || [];
-
-			// Check if any of the note's contexts match the active contexts
-			const hasActiveContext = noteContexts.some((noteContext: string) => activeContexts.includes(noteContext));
-
-			// If no active context is found, use the first spacing method
-			const activeSpacingMethod = hasActiveContext
-				? this.settings.spacingMethods.find(method => activeContexts.some(context => context === method.name))
-				: this.settings.spacingMethods[0];
-
-			return activeSpacingMethod !== undefined;
-		});
-	}
-*/
 	private filterNotesByContext(files: TFile[]): TFile[] {
 		const activeContexts = this.settings.contexts.filter(context => context.isActive).map(context => context.name);
 

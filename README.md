@@ -1,8 +1,10 @@
-# Spaced writing practice (Obsidian plugin)
+# Spaced Everything (Obsidian plugin)
 
-_[Obsidian](https://obsidian.md/) plugin to apply spaced repetition to incrementally develop your notes._
+_[Obsidian](https://obsidian.md/) plugin to apply spaced repetition algorithms to everything in your vault._
 
-Borrowing from Andy Matuschak's [notes](https://notes.andymatuschak.org/About_these_notes?stackedNotes=zVFGpprS64TzmKGNzGxq9FiCDnAnCPwRU5T&stackedNotes=z5aJUJcSbxuQxzHr2YvaY4cX5TuvLQT7r27Dz&stackedNotes=z8aZybuJJopS5fL7TnPou2JcmCsBUJeqirbBh&stackedNotes=zJ5Yzvba2729XKXivBBZ91J&stackedNotes=zB92WZZ5baBHKZPPbWMbYEv&stackedNotes=zHwr5v9VJGX3MzHyzz4V8wt&stackedNotes=zDXBGEWk7msyonQ2Ngnrf8h&stackedNotes=zSK4LyrCbG9zDrdCWmcovUW&stackedNotes=z4KxfCZPkVEf2R8nayLJZBG) outlining such a practice, this plugin applies the main concepts of spaced repetition to writing. That is, using the SuperMemo-2.0 algorithm to automatically decide what note to review next when engaging in a Spaced Writing Practice (SWP).
+Borrowing from Andy Matuschak's [notes](https://notes.andymatuschak.org/About_these_notes?stackedNotes=zVFGpprS64TzmKGNzGxq9FiCDnAnCPwRU5T&stackedNotes=z5aJUJcSbxuQxzHr2YvaY4cX5TuvLQT7r27Dz&stackedNotes=z8aZybuJJopS5fL7TnPou2JcmCsBUJeqirbBh&stackedNotes=zJ5Yzvba2729XKXivBBZ91J&stackedNotes=zB92WZZ5baBHKZPPbWMbYEv&stackedNotes=zHwr5v9VJGX3MzHyzz4V8wt&stackedNotes=zDXBGEWk7msyonQ2Ngnrf8h&stackedNotes=zSK4LyrCbG9zDrdCWmcovUW&stackedNotes=z4KxfCZPkVEf2R8nayLJZBG) outlining such a practice, this plugin applies the main concepts of spaced repetition to writing. That is, using the SuperMemo-2.0 algorithm to decide what note to review next when engaging in a Spaced Writing Practice (SWP). 
+
+(still under development): The plugin is extensible. It allows each note to be tagged to different contexts (e.g., work vs personal) to only pull up notes approriate for the moment. Each context may optionally apply different spacing algorithms. This includes fully customized JavaScript implementations to derive your own spacing algorithms, in addition to built-in implementations. 
 
 ## Features
 
@@ -16,7 +18,7 @@ You may customize these options for this review process. You may add or delete o
 
 At any time, you may run the "Open next review note" command to pull up the next note in your review queue. This is calculated based on looking across the SWP frontmatter properties of notes in your vault. From there, it adds the interval value (in days) to the last review timestamp to derive the due date for each note. Then any notes with a due date in the future are filtered out. Among remaining notes, it sorts it by the earliest/oldest due date timestamp first and pulls notes in that order.
 
-### Review contexts
+### Toggle note contexts
 
 By default, all notes are treated as one large queue of notes to review. However, you may optionally add any number of separate contexts to filter down which subset of notes to include when pulling up the next note in the review queue. When onboarding notes, it will prompt you to select which SWP context to add the note into. You may also run the "Toggle note contexts" command on any note to add/remove the note from any context. 
 

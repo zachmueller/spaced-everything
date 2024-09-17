@@ -18,3 +18,4 @@ Below are some further ideas for things I might want to implement in this plugin
 - Maybe implement my [session wrapper template](https://notes.zach.nz/Note-template---Session-wrapper-for-my-spaced-writing-practice) functionality
 - Further customization within the SuperMemo-2.0 algorithm
 - Implement other spacing algorithms
+- Time of day auto-switching between which contexts are active?

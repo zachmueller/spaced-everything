@@ -133,13 +133,13 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 		const choices = this.settings.contexts.map(context => {
 			const isSelected = currentContexts.includes(context.name);
-			return `${isSelected ? '[X]' : '[ ]'} ${context.name}`;
+			return `${isSelected ? '☑' : '☐'} ${context.name}`;
 		});
 
 		const selectedChoice = await this.suggester(choices, "Select contexts for this note:");
 
 		if (selectedChoice) {
-			const selectedContext = selectedChoice.replace(/\[(X|\s)\]\s/, '');
+			const selectedContext = selectedChoice.replace(/(?:☑|☐)\s/, '');
 			const updatedContexts = currentContexts.filter((context: string) => context !== selectedContext);
 
 			if (!currentContexts.includes(selectedContext)) {

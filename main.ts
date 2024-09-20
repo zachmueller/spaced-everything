@@ -435,7 +435,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl).setName('Spacing Methods').setHeading();
+		new Setting(containerEl).setName('Spacing methods').setHeading();
 		const spacingMethodsSettingDiv = containerEl.createDiv();
 		const spacingMethodsDiv = containerEl.createDiv();
 		const addSpacingMethodDiv = containerEl.createDiv();
@@ -570,7 +570,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		const settingBody = settingEl.createDiv('spacing-method-body');
 
 		new Setting(settingHeader)
-			.setName(`Spacing Method - #${index + 1}`)
+			.setName(`Spacing method - #${index + 1}`)
 			.setDesc('Configure the settings for this spacing method.');
 
 		const generalSettingsDiv = settingBody.createDiv('general-settings');
@@ -603,7 +603,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 						spacingMethod.defaultInterval = numericValue;
 						await this.plugin.saveSettings();
 					} else {
-						new Notice('Default Interval must be a number.');
+						new Notice('Default interval must be a number.');
 					}
 				})
 			);
@@ -615,7 +615,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				dropdown
 				.addOptions({
 					'SuperMemo2.0': 'SuperMemo 2.0',
-					'Custom': 'Custom Script',
+					'Custom': 'Custom script',
 				})
 				.setValue(spacingMethod.spacingAlgorithm)
 				.onChange(async (value) => {
@@ -630,7 +630,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 			// TODO::hide unless 'Custom Script' option set above::
 			.addText((text) =>
 				text
-				.setPlaceholder('Custom Script File Name')
+				.setPlaceholder('Custom script file name')
 				.setValue(spacingMethod.customScriptFileName)
 				.onChange(async (value) => {
 					// TODO::implement helper stuff for auto-completing paths/filenames::
@@ -654,7 +654,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 						spacingMethod.defaultEaseFactor = numericValue;
 						await this.plugin.saveSettings();
 					} else {
-						new Notice('Default Ease Factor must be a number.');
+						new Notice('Default ease factor must be a number.');
 					}
 				})
 				.setDisabled(spacingMethod.spacingAlgorithm !== 'SuperMemo2.0')
@@ -664,7 +664,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		const reviewOptionsDiv = settingBody.createDiv('review-options');
 		new Setting(reviewOptionsDiv)
 			.setHeading()
-			.setName('Review Options')
+			.setName('Review options')
 			.setDesc('Customize the review options and scores to use in this spacing method. For the SuperMemo-2.0 spacing algorithm, review scores must be a number from 0 to 5.');
 
 		const addReviewOptionDiv = reviewOptionsDiv.createDiv();

@@ -1,5 +1,5 @@
 import { TFile, App } from 'obsidian';
-import { SpacedEverythingPluginSettings } from './main';
+import { SpacedEverythingPluginSettings } from './settings';
 
 export class Logger {
 	private app: App;

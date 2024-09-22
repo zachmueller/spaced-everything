@@ -440,8 +440,21 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		const spacingMethodsDiv = containerEl.createDiv();
 		const addSpacingMethodDiv = containerEl.createDiv();
 
+		// construct description to include link to docs
+		const desc = document.createDocumentFragment();
+		desc.append(
+			'Define and manage the spacing methods you want to use for your spaced everything practice. ',
+			'You can create multiple spacing methods and map them to different contexts. ',
+			'Check the ',
+			desc.createEl('a', {
+				href: 'https://github.com/zachmueller/spaced-everything/blob/main/README.md',
+				text: 'documentation',
+			}),
+			' for more information.'
+		);
+		
 		new Setting(spacingMethodsSettingDiv)
-			.setDesc('Define and manage the spacing methods you want to use for your spaced everything practice. You can create multiple spacing methods and map them to different contexts.');
+			.setDesc(desc);
 
 		this.plugin.settings.spacingMethods.forEach((spacingMethod, index) => {
 			this.renderSpacingMethodSetting(spacingMethodsDiv, spacingMethod, index);

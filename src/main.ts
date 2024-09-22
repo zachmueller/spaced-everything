@@ -452,6 +452,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				button
 				.setButtonText('+')
 				.setIcon('plus')
+				.setTooltip('Add a new spacing method')
 				.onClick(async () => {
 					const newSpacingMethod: SpacingMethod = {
 						name: '',
@@ -489,6 +490,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 				button
 				.setButtonText('+')
 				.setIcon('plus')
+				.setTooltip('Add new context')
 				.onClick(async () => {
 					const newContext: Context = {
 						name: '',
@@ -506,7 +508,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 		
 		new Setting(containerEl)
 			.setName('Log spaced everything practice activity')
-			.setDesc('Choose the file path where Spaced Everything logs are stored. Leave blank to not capture logs. Note: output data format is JSONL (i.e., `.jsonl` file format recommended).')
+			.setDesc('Choose the file path where Spaced Everything logs are stored. Leave blank to not capture logs. Note: output data format is JSONL (i.e., `.jsonl` filename extension recommended).')
 			.addText(text => text
 				.setValue(this.plugin.settings.logFilePath)
 				.onChange(async (value) => {
@@ -692,7 +694,7 @@ class SpacedEverythingSettingTab extends PluginSettingTab {
 			// more clearly distinct from review options expansion::
 			.addExtraButton((cb) => {
 				cb.setIcon('cross')
-				.setTooltip('Delete')
+				.setTooltip('Delete spacing method')
 				.onClick(async () => {
 					this.plugin.settings.spacingMethods.splice(index, 1);
 					await this.plugin.saveSettings();

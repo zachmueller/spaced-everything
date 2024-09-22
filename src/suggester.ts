@@ -24,3 +24,11 @@ export class Suggester extends SuggestModal<string> {
 		this.onChooseItem(item);
 	}
 }
+
+export async function suggester(options: string[], promptText: string): Promise<string | null> {
+	return new Promise((resolve) => {
+		const modal = new Suggester(this.app, promptText, options);
+		modal.onChooseItem = resolve;
+		modal.open();
+	});
+}

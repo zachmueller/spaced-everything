@@ -1,8 +1,8 @@
-import { App, Editor, MarkdownView, TFile, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, TFile, Notice, Plugin } from 'obsidian';
 import { Context, ReviewOption, SpacingMethod } from './types';
 import { Logger } from './logger';
 import { SpacedEverythingPluginSettings, SpacedEverythingSettingTab } from './settings';
-import { Suggester } from './suggester';
+import { Suggester, suggester } from './suggester';
 
 const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	logFilePath: "", // defaults to no logging
@@ -81,7 +81,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			return `${isSelected ? '☑' : '☐'} ${context.name}`;
 		});
 
-		const selectedChoice = await this.suggester(choices, "Select contexts for this note:");
+		const selectedChoice = await suggester(choices, "Select contexts for this note:");
 
 		if (selectedChoice) {
 			const selectedContext = selectedChoice.replace(/(?:☑|☐)\s/, '');
@@ -119,7 +119,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			}
 
 			const reviewOptions = [...activeSpacingMethod.reviewOptions.map((option) => option.name), 'Remove'];
-			const reviewResult = await this.suggester(reviewOptions, 'Select review outcome:');
+			const reviewResult = await suggester(reviewOptions, 'Select review outcome:');
 
 			if (!reviewResult) {
 				// exit if user presses Esc on the suggester
@@ -236,17 +236,9 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
-	async suggester(options: string[], promptText: string): Promise<string | null> {
-		return new Promise((resolve) => {
-			const modal = new Suggester(this.app, promptText, options);
-			modal.onChooseItem = resolve;
-			modal.open();
-		});
-	}
-
 	async selectContext(validContexts: string[]): Promise<string | null> {
 		const promptText = "Select a context for this note:";
-		return this.suggester(validContexts, promptText);
+		return suggester(validContexts, promptText);
 	}
 
 	async isNoteOnboarded(file: TFile, frontmatter: any): Promise<boolean> {

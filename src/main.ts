@@ -193,6 +193,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 	async toggleNoteContexts(editor?: Editor, view?: MarkdownView) {
 		if (this.settings.contexts.length === 0) {
 			// no contexts to toggle
+			new Notice('Spaced Everything: No contexts defined');
 			return;
 		}
 

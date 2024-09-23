@@ -10,7 +10,12 @@ interface SpacedEverythingPluginSettings {
 	logFrontMatterProperties: string[];
 	contexts: Context[];
 	spacingMethods: SpacingMethod[];
-	// TODO::add things related to "capture thought" functionality::
+	capturedThoughtTitleTemplate: string;
+	capturedThoughtDirectory: string;
+	capturedThoughtNoteTemplate: string;
+	includeShortThoughtInAlias: boolean;
+	shortCapturedThoughtThreshold: number;
+	openCapturedThoughtInNewTab: boolean;
 }
 
 export type { SpacedEverythingPluginSettings };
@@ -170,6 +175,89 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				});
 			});
+
+		// Capture thoughts settings
+		new Setting(containerEl).setName('Capture thought').setHeading();
+
+		new Setting(containerEl)
+			.setName('Note title template')
+			.setDesc('Template for generating the title of the new note')
+			.addText((text) =>
+				text
+					.setPlaceholder('Enter your template here')
+					.setValue(this.plugin.settings.capturedThoughtTitleTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.capturedThoughtTitleTemplate = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName('Note directory')
+			.setDesc('Directory where the new note should be created (leave empty for default directory)')
+			.addText((text) =>
+				text
+					.setPlaceholder('Enter your directory path here')
+					.setValue(this.plugin.settings.capturedThoughtDirectory)
+					.onChange(async (value) => {
+						const trimmedValue = value.replace(/\/+$/, ''); // Remove trailing slashes
+						this.plugin.settings.capturedThoughtDirectory = trimmedValue;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl) // TODO::fix this to make the input more intuitive for multi-line templates::
+			.setName('New note template')
+			.setDesc('Template for the initial content of the new note')
+			.addText((text) =>
+				text
+					.setPlaceholder('Enter your template here')
+					.setValue(this.plugin.settings.capturedThoughtNoteTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.capturedThoughtNoteTemplate = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName('Include short thought in alias')
+			.setDesc('Include the thought as an alias in the frontmatter if it\'s shorter than the threshold')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.includeShortThoughtInAlias)
+					.onChange(async (value) => {
+						this.plugin.settings.includeShortThoughtInAlias = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName('Short thought threshold')
+			.setDesc('Maximum length of the thought (in characters) for it to be included as an alias')
+			.addText((text) =>
+				text
+					.setPlaceholder('Enter your threshold here')
+					.setValue(this.plugin.settings.shortCapturedThoughtThreshold.toString())
+					.onChange(async (value) => {
+						const numericValue = parseInt(value, 10);
+						if (!isNaN(numericValue) && numericValue >= 0) {
+							this.plugin.settings.shortCapturedThoughtThreshold = numericValue;
+							await this.plugin.saveSettings();
+						}
+					})
+			);
+
+		new Setting(containerEl)
+			.setName('Open captured thought in new tab')
+			.setDesc('Open the newly created note in a new tab or the current tab')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.openCapturedThoughtInNewTab)
+					.onChange(async (value) => {
+						this.plugin.settings.openCapturedThoughtInNewTab = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 
 	renderSpacingMethodSetting(containerEl: HTMLElement, spacingMethod: SpacingMethod, index: number) {

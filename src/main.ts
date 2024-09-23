@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, TFile, Notice, Plugin } from 'obsidian';
+import { App, Editor, MarkdownView, TFile, Notice, Plugin, Modal } from 'obsidian';
 import { Context, ReviewOption, SpacingMethod } from './types';
 import { Logger } from './logger';
 import { SpacedEverythingPluginSettings, SpacedEverythingSettingTab } from './settings';
@@ -25,6 +25,12 @@ const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 			defaultEaseFactor: 2.5,
 		},
 	],
+	capturedThoughtTitleTemplate: "Inbox {{unixtime}}",
+	capturedThoughtDirectory: "",
+	capturedThoughtNoteTemplate: "## Captured thought\n{{thought}}",
+	includeShortThoughtInAlias: true,
+	shortCapturedThoughtThreshold: 200,
+	openCapturedThoughtInNewTab: false,
 }
 
 export default class SpacedEverythingPlugin extends Plugin {
@@ -64,9 +70,132 @@ export default class SpacedEverythingPlugin extends Plugin {
 				this.toggleNoteContexts(editor, view)
 			}
 		});
+
+		// Add a new command to capture thoughts
+		this.addCommand({
+			id: 'capture-thought',
+			name: 'Capture thought',
+			callback: () => {
+				this.captureThought()
+			}
+		});
+	}
+
+	async captureThought() {
+		// craft modal for collecting user input
+		const modal = new Modal(this.app);
+		modal.contentEl.createEl("h3", { text: "Capture thought" });
+
+		// Create a container element to hold the variable names and commas
+		const variableNamesContainer = modal.contentEl.createEl("span");
+
+		// Create elements for each variable name wrapped in <code> tags
+		const variableNameElements = [
+		  variableNamesContainer.createEl("code", { text: "{{unixtime}}" }),
+		  variableNamesContainer.createEl("span", { text: ", " }),
+		  variableNamesContainer.createEl("code", { text: "{{date}}" }),
+		  variableNamesContainer.createEl("span", { text: ", and " }),
+		  variableNamesContainer.createEl("code", { text: "{{time}}" }),
+		];
+
+		variableNamesContainer.createEl("span", { text: `Write out your thought here. You have access to the following variables: ` });
+		variableNameElements.forEach(el => variableNamesContainer.appendChild(el));
+
+		modal.contentEl.createEl("br", {});
+		modal.contentEl.createEl("br", {});
+
+		const textArea = modal.contentEl.createEl("textarea");
+		textArea.style.height = "100%";
+		textArea.style.width = "100%";
+
+		// add usage footnotes
+		modal.contentEl.createEl("small", { text: "Shift + Enter for new lines." });
+		modal.contentEl.createEl("br", {});
+		modal.contentEl.createEl("small", { text: "Enter to submit." });
+
+		const handleSubmit = async (thought: string | null): Promise<void> => {
+			if (thought === null || thought === "") {
+				new Notice("Cancelled by the user");
+				return;
+			}
+
+			modal.close();
+
+			const now = new Date();
+			thought = this.processCapturedThoughtNewNoteContents(thought, now);
+			const newNoteFile = await this.createNewNoteFile(thought, now);
+			await this.openNewNote(newNoteFile);
+			let aliases: string[] = [];
+			await this.onboardNoteToSpacedEverything(newNoteFile, {});
+
+			// TODO::need to refactor how I handle note frontmatter generally across the code base for maintainability::
+			await this.app.fileManager.processFrontMatter(newNoteFile, async (frontmatter: any) => {
+				frontmatter["se-capture-time"] = Math.floor(now.getTime() / 1000).toString();
+				if (this.settings.includeShortThoughtInAlias && thought 
+					&& thought.length <= this.settings.shortCapturedThoughtThreshold) {
+					frontmatter["aliases"] = [thought];
+				}
+			});
+		};
+
+		textArea.addEventListener("keydown", (event) => {
+			if (event.key === "Enter" && !event.shiftKey) {
+				event.preventDefault();
+				handleSubmit(textArea.value || null);
+			}
+		});
+
+		modal.open();
+	}
+
+	private processCapturedThoughtNewNoteContents(thought: string, now: Date): string {
+		thought = thought.trim();
+		thought = this.replaceCapturedThoughtVariables(thought, now);
+
+		return thought;
+	}
+
+	private replaceCapturedThoughtVariables(content: string, now: Date): string {
+		const unixTime = Math.floor(now.getTime() / 1000).toString();
+		const dateString = now.toISOString().split("T")[0];
+		const timeString = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+		content = content.replace(/{{unixtime}}/g, unixTime.toString())
+			.replace(/{{date}}/g, dateString)
+			.replace(/{{time}}/g, timeString);
+
+		return content;
+	}
+
+	async createNewNoteFile(thought: string, now: Date): Promise<TFile> {
+		const noteTitle = this.replaceCapturedThoughtVariables(this.settings.capturedThoughtTitleTemplate, now);
+
+		const noteDirectory = this.settings.capturedThoughtDirectory || "";
+		const newNotePath = `${noteDirectory}/${noteTitle}.md`;
+
+		const newNoteContent = this.settings.capturedThoughtNoteTemplate.replace(/{{thought}}/g, thought);
+
+		const newNoteFile = await this.app.vault.create(newNotePath, newNoteContent);
+
+		return newNoteFile;
+	}
+
+	async openNewNote(newNoteFile: TFile) {
+		const { openCapturedThoughtInNewTab } = this.settings;
+
+		if (openCapturedThoughtInNewTab) {
+			await this.app.workspace.openLinkText(newNoteFile.path, newNoteFile.path, true, { active: true });
+		} else {
+			const leaf = this.app.workspace.getLeaf(true);
+			await leaf.openFile(newNoteFile);
+		}
 	}
 
 	async toggleNoteContexts(editor?: Editor, view?: MarkdownView) {
+		if (this.settings.contexts.length === 0) {
+			// no contexts to toggle
+			return;
+		}
+
 		const activeFile = this.app.workspace.getActiveFile()
 		if (!activeFile) {
 			new Notice("No active file to toggle contexts.");
@@ -247,23 +376,23 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 	async onboardNoteToSpacedEverything(file: TFile, frontmatter: any): Promise<boolean> {
 		const now = new Date().toISOString().split('.')[0];
-		
+
 		// prompt user to select contexts
 		await this.toggleNoteContexts();
-		
+
 		const activeSpacingMethod = this.getActiveSpacingMethod(file, frontmatter);
 
 		// add standard Spaced Everything frontmatter properties and values
 		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
 			frontmatter["se-interval"] = activeSpacingMethod?.defaultInterval || 1;
 			frontmatter["se-last-reviewed"] = now;
-			frontmatter["se-ease"] = activeSpacingMethod?.defaultEaseFactor; // TODO::make sure this is optional
+			frontmatter["se-ease"] = activeSpacingMethod?.defaultEaseFactor; // TODO::make sure this is optional::
 		});
-		
+
 		if (this.settings.logOnboardAction) {
 			this.logger.log('onboarded', file, frontmatter);
 		}
-		
+
 		new Notice(`Onboarded note to Spaced Everything: ${file.basename}`);
 		return true;
 	}

@@ -3,7 +3,6 @@
 ## Shift towards Spaced Everything
 
 After re-reading various of Andy Matuschak's notes, I want to implement a few additional things and rename this project to "Spaced Everything". For that, some new features:
-- Basic writing inbox implementation (taking from my [template implementation](https://notes.zach.nz/Note-template---Writing-inbox) based on Andy's [concept](https://notes.andymatuschak.org/zUP4GuzPF33dWkZPiu9N6V5)) that captures a thought, creates a new note with that thought, and automatically onboards the note to the spaced review queue. Need to make it as easy as possible to get everything into a consolidated spaced repetition system.
 - Cloze deletions and Q/A stuff often seen throughout Andy's notes
 
 Also, some minor changes of existing code:

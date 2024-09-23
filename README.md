@@ -16,7 +16,11 @@ You may customize these options for this review process. You may add or delete o
 
 ### Pull up next note in review queue
 
-At any time, you may run the "Open next review note" command to pull up the next note in your review queue. This is calculated based on looking across the SWP frontmatter properties of notes in your vault. From there, it adds the interval value (in days) to the last review timestamp to derive the due date for each note. Then any notes with a due date in the future are filtered out. Among remaining notes, it sorts it by the earliest/oldest due date timestamp first and pulls notes in that order.
+At any time, you may run the "Open next review item" command to pull up the next note in your review queue. This is calculated based on looking across the SWP frontmatter properties of notes in your vault. From there, it adds the interval value (in days) to the last review timestamp to derive the due date for each note. Then any notes with a due date in the future are filtered out. Among remaining notes, it sorts it by the earliest/oldest due date timestamp first and pulls notes in that order.
+
+### Capture thoughts
+
+Inspired by Andy Matuschak's [writing inbox concept](https://notes.andymatuschak.org/zUP4GuzPF33dWkZPiu9N6V5), the "Capture thought" command allows for a rapid way to write down any sudden thought and have it immediately onboarded to the spaced writing queue.
 
 ### Toggle note contexts
 

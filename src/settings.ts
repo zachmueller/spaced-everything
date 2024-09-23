@@ -248,8 +248,8 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName('Open captured thought in new tab')
-			.setDesc('Open the newly created note in a new tab or the current tab')
+			.setName('Open in new tab')
+			.setDesc('Open the newly created note in a new tab. If turned off, captured thought note opens in currently active tab.')
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.openCapturedThoughtInNewTab)

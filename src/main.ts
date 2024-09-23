@@ -182,12 +182,16 @@ export default class SpacedEverythingPlugin extends Plugin {
 	async openNewNote(newNoteFile: TFile) {
 		const { openCapturedThoughtInNewTab } = this.settings;
 
-		if (openCapturedThoughtInNewTab) {
-			await this.app.workspace.openLinkText(newNoteFile.path, newNoteFile.path, true, { active: true });
-		} else {
-			const leaf = this.app.workspace.getLeaf(true);
-			await leaf.openFile(newNoteFile);
+		if (!openCapturedThoughtInNewTab) {
+			const activeLeaf = this.app.workspace.activeLeaf;
+			if (activeLeaf) {
+				await activeLeaf.openFile(newNoteFile);
+				return;
+			} else {
+				new Notice('No active editor, opened note in new tab');
+			}
 		}
+		await this.app.workspace.openLinkText(newNoteFile.path, newNoteFile.path, true, { active: true });
 	}
 
 	async toggleNoteContexts(editor?: Editor, view?: MarkdownView) {

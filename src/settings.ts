@@ -61,8 +61,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		new Setting(addSpacingMethodDiv)
 			.addButton((button) =>
 				button
-				.setButtonText('+')
-				.setIcon('plus')
+				.setButtonText('Add spacing method')
 				.setTooltip('Add a new spacing method')
 				.onClick(async () => {
 					const newSpacingMethod: SpacingMethod = {

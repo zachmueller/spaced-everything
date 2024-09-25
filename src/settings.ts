@@ -66,7 +66,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setTooltip('Add a new spacing method')
 				.onClick(async () => {
 					const newSpacingMethod: SpacingMethod = {
-						name: '',
+						name: `Spacing method #${this.plugin.settings.spacingMethods.length + 1}`,
 						spacingAlgorithm: 'SuperMemo2.0',
 						customScriptFileName: '',
 						reviewOptions: [],
@@ -76,6 +76,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					this.plugin.settings.spacingMethods.push(newSpacingMethod);
 					await this.plugin.saveSettings();
 					this.renderSpacingMethodSetting(spacingMethodsDiv, newSpacingMethod, this.plugin.settings.spacingMethods.length - 1);
+					this.display(); // Re-render the settings tab to ensure new method shows up for context dropdown
 				})
 			);
 
@@ -265,8 +266,10 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		const settingHeader = settingEl.createDiv('spacing-method-header');
 		const settingBody = settingEl.createDiv('spacing-method-body');
 
+		const defaultName = `Spacing method #${index + 1}`;
+
 		new Setting(settingHeader)
-			.setName(`Spacing method - #${index + 1}`)
+			.setName(defaultName)
 			.setDesc('Configure the settings for this spacing method.');
 
 		const generalSettingsDiv = settingBody.createDiv('general-settings');
@@ -278,10 +281,10 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			.addText((text) => {
 				const textComponent = text
 					.setPlaceholder('Name')
-					.setValue(spacingMethod.name)
+					.setValue(spacingMethod.name || defaultName)
 					.onChange(async (value) => {
 						if (!value.trim()) {
-							spacingMethod.name = `Spacing method - #${index + 1}`;
+							spacingMethod.name = defaultName;
 						} else {
 							spacingMethod.name = value;
 						}

@@ -271,22 +271,39 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		const generalSettingsDiv = settingBody.createDiv('general-settings');
 		
+		let oldName = spacingMethod.name;
 		new Setting(generalSettingsDiv)
 			.setName('Name')
 			.setDesc('Enter a name for this spacing method')
-			.addText((text) =>
-				text
-				.setPlaceholder('Name')
-				.setValue(spacingMethod.name)
-				.onChange(async (value) => {
-					if (!value.trim()) {
-						spacingMethod.name = `Spacing method - #${index + 1}`;
-					} else {
-						spacingMethod.name = value;
+			.addText((text) => {
+				const textComponent = text
+					.setPlaceholder('Name')
+					.setValue(spacingMethod.name)
+					.onChange(async (value) => {
+						if (!value.trim()) {
+							spacingMethod.name = `Spacing method - #${index + 1}`;
+						} else {
+							spacingMethod.name = value;
+						}
+						await this.plugin.saveSettings();
+					});
+
+				textComponent.inputEl.addEventListener('blur', () => {
+					// Update contexts that were previously mapped to the old name
+					if (oldName && oldName !== spacingMethod.name) {
+						this.plugin.settings.contexts.forEach((context) => {
+							if (context.spacingMethodName === oldName) {
+								context.spacingMethodName = spacingMethod.name;
+							}
+						});
+						await this.plugin.saveSettings();
 					}
-					await this.plugin.saveSettings();
-				})
-			);
+
+					this.display(); // Re-render the settings tab
+				});
+
+				return textComponent;
+			});
 
 		new Setting(generalSettingsDiv)
 			.setName('Default interval')
@@ -399,6 +416,10 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			});
 	}
 
+	private getSpacingMethodDropdownOptions(): Record<string, string> {
+		return Object.fromEntries(this.plugin.settings.spacingMethods.map((method) => [method.name, method.name]));
+	}
+
 	renderContextSetting(containerEl: HTMLElement, context: Context, index: number) {
 		const settingEl = containerEl.createDiv('context-settings-items');
 
@@ -406,39 +427,37 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			.setName(`(${index + 1})`)
 			.addText((text) =>
 				text
-				.setValue(context.name)
-				.onChange(async (value) => {
-					context.name = value;
-					await this.plugin.saveSettings();
-				})
+					.setValue(context.name)
+					.onChange(async (value) => {
+						context.name = value;
+						await this.plugin.saveSettings();
+					})
 			)
 			.addToggle((toggle) =>
 				toggle
-				.setValue(context.isActive)
-				.onChange(async (value) => {
-					context.isActive = value;
-					await this.plugin.saveSettings();
-				})
+					.setValue(context.isActive)
+					.onChange(async (value) => {
+						context.isActive = value;
+						await this.plugin.saveSettings();
+					})
 			)
 			.addDropdown((dropdown) =>
 				dropdown
-				.addOptions(Object.fromEntries(
-					this.plugin.settings.spacingMethods.map((method) => [method.name, method.name])
-				))
-				.setValue(context.spacingMethodName)
-				.onChange(async (value) => {
-					context.spacingMethodName = value;
-					await this.plugin.saveSettings();
-				})
+					.addOptions(this.getSpacingMethodDropdownOptions())
+					.setValue(context.spacingMethodName)
+					.onChange(async (value) => {
+						context.spacingMethodName = value;
+						await this.plugin.saveSettings();
+					})
 			)
 			.addExtraButton((cb) => {
 				cb.setIcon('cross')
-				.setTooltip('Delete')
-				.onClick(async () => {
-					this.plugin.settings.contexts.splice(index, 1);
-					await this.plugin.saveSettings();
-					this.display(); // Re-render the settings tab
-				});
+					.setTooltip('Delete')
+					.onClick(async () => {
+						this.plugin.settings.contexts.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.display(); // Re-render the settings tab
+					});
 			});
 	}
 

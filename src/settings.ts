@@ -206,11 +206,11 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl) // TODO::fix this to make the input more intuitive for multi-line templates::
+		new Setting(containerEl)
 			.setName('New note template')
 			.setDesc('Template for the initial content of the new note')
-			.addText((text) =>
-				text
+			.addTextArea((ta) =>
+				ta
 					.setPlaceholder('Enter your template here')
 					.setValue(this.plugin.settings.capturedThoughtNoteTemplate)
 					.onChange(async (value) => {

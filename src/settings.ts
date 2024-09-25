@@ -279,9 +279,11 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setPlaceholder('Name')
 				.setValue(spacingMethod.name)
 				.onChange(async (value) => {
-					// TODO::ensure this does not get left blank (leads to confusing 
-					// settings dropdown for contexts below if so)::
-					spacingMethod.name = value;
+					if (!value.trim()) {
+						spacingMethod.name = `Spacing method - #${index + 1}`;
+					} else {
+						spacingMethod.name = value;
+					}
 					await this.plugin.saveSettings();
 				})
 			);

@@ -296,7 +296,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 								context.spacingMethodName = spacingMethod.name;
 							}
 						});
-						await this.plugin.saveSettings();
+						this.plugin.saveSettings();
 					}
 
 					this.display(); // Re-render the settings tab

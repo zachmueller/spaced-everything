@@ -161,7 +161,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Log frontmatter properties')
-			.setDesc('Provide a list (one per line) of frontmatter properties you would like to include in the Spaced Everything logs')
+			.setDesc('Provide a list (one per line) of frontmatter properties you would like to include in the Spaced Everything logs. Input just an asterisk (*) to include all frontmatter properties.')
 			// TODO::enable input to "select all" frontmatter properties::
 			.addTextArea(textArea => {
 				const properties = this.plugin.settings.logFrontMatterProperties ?? [];
@@ -170,8 +170,12 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setPlaceholder('Enter frontmatter properties, one per line')
 				.setValue(propertyStr)
 				.onChange(async (value) => {
-					const properties = value.trim().split('\n').filter(property => property.trim() !== '');
-					this.plugin.settings.logFrontMatterProperties = properties;
+					if (value.trim() === '*') {
+						this.plugin.settings.logFrontMatterProperties = ['*'];
+					} else {
+						const properties = value.trim().split('\n').filter(property => property.trim() !== '');
+						this.plugin.settings.logFrontMatterProperties = properties;
+					}
 					await this.plugin.saveSettings();
 				});
 			});

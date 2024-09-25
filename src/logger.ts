@@ -31,9 +31,14 @@ export class Logger {
 
 		if (this.settings.logFrontMatterProperties.length > 0) {
 			logData.frontmatter = {};
-			for (const property of this.settings.logFrontMatterProperties) {
-				if (frontmatter[property]) {
-					logData.frontmatter[property] = frontmatter[property];
+			const arr = this.settings.logFrontMatterProperties;
+			if (Array.isArray(arr) && arr.length === 1 && arr[0] === '*') {
+				logData.frontmatter = frontmatter;
+			} else {
+				for (const property of this.settings.logFrontMatterProperties) {
+					if (frontmatter[property]) {
+						logData.frontmatter[property] = frontmatter[property];
+					}
 				}
 			}
 		}

@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	includeShortThoughtInAlias: true,
 	shortCapturedThoughtThreshold: 200,
 	openCapturedThoughtInNewTab: false,
+	onboardingExcludedFolders: []
 }
 
 export default class SpacedEverythingPlugin extends Plugin {

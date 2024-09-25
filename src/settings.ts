@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, normalizePath, Modal, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { Context, ReviewOption, SpacingMethod } from './types';
 import SpacedEverythingPlugin from './main';
 
@@ -16,6 +16,7 @@ interface SpacedEverythingPluginSettings {
 	includeShortThoughtInAlias: boolean;
 	shortCapturedThoughtThreshold: number;
 	openCapturedThoughtInNewTab: boolean;
+	onboardingExcludedFolders: string[];
 }
 
 export type { SpacedEverythingPluginSettings };
@@ -262,8 +263,81 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+
+		// Onboard all notes
+		new Setting(containerEl).setName('Onboard all notes (beta)')
+			.setHeading()
+			.setDesc('This provides an optional means of onboarding every note in your vault to the Spaced Everything system. Importantly, the plugin uses frontmatter properties on notes to track relevant metadata to perform the spacing algorithm actions. So it is recommended to use the "Excluded folders" setting below to filter out subsets of notes that you wish to avoid onboarding. Performing this action will not change any existing Spaced Everything frontmatter if you already have some notes oboarded.\n\nThis is still a beta feature. Currently, it asusmes to only apply the settings from the first Spacing Method (defined above) and assumes to not set any context for notes onboarded in this manner.');
+
+		new Setting(containerEl)
+			.setName('Excluded folders')
+			.setDesc('Enter the paths of any folders you want to exclude from the onboarding process (one per line). Consider adding folders that contain things like templates or scripts that may not work if frontmatter properties are added to them.')
+			.addTextArea((textArea) => {
+				textArea.setValue(this.plugin.settings.onboardingExcludedFolders.join('\n')).onChange(async (value) => {
+					this.plugin.settings.onboardingExcludedFolders = value.trim().split('\n').filter((v) => v);
+					await this.plugin.saveSettings();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName('Onboard all notes')
+			.setDesc('Click the button to add the required frontmatter properties to all notes in your vault, excluding the folders specified above.')
+			.addButton((button) =>
+				button
+					.setButtonText('Onboard all notes')
+					.onClick(async () => this.showConfirmationModal())
+			);
 	}
 
+
+	// functions for onboarding all notes
+	async showConfirmationModal() {
+		const modal = new ConfirmationModal(this.app, this.plugin);
+		modal.open();
+	}
+
+	async addFrontMatterPropertiesToAllNotes() {
+		const files = this.app.vault.getMarkdownFiles();
+
+		for (const file of files) {
+			if (!this.isFileExcluded(file)) {
+				await this.addFrontMatterPropertiesToNote(file);
+			}
+		}
+	}
+
+	isFileExcluded(file: TAbstractFile): boolean {
+		const excludedFolders = this.plugin.settings.onboardingExcludedFolders;
+		let parent: TFolder | null = file.parent;
+
+		while (parent) {
+			if (excludedFolders.includes(parent.path)) {
+				return true;
+			}
+			parent = parent.parent;
+		}
+
+		return false;
+	}
+
+	async addFrontMatterPropertiesToNote(file: TFile) {
+		const frontMatter = this.app.metadataCache.getCache(file.path)?.frontmatter;
+		const modifiedFrontMatter = {
+			'se-interval': frontMatter?.['se-interval'] || this.plugin.settings.spacingMethods[0].defaultInterval,
+			'se-last-reviewed': frontMatter?.['se-last-reviewed'] || new Date().toISOString().split('.')[0],
+			'se-ease': frontMatter?.['se-ease'] || this.plugin.settings.spacingMethods[0].defaultEaseFactor,
+		};
+
+		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
+			frontmatter["se-interval"] = modifiedFrontMatter["se-interval"];
+			frontmatter["se-last-reviewed"] = modifiedFrontMatter["se-last-reviewed"];
+			frontmatter["se-ease"] = modifiedFrontMatter["se-ease"];
+		});
+	}
+
+
+	// Functions for rendering subsets of the settings
 	renderSpacingMethodSetting(containerEl: HTMLElement, spacingMethod: SpacingMethod, index: number) {
 		const settingEl = containerEl.createDiv('spacing-method-settings-items');
 		const settingHeader = settingEl.createDiv('spacing-method-header');
@@ -515,5 +589,47 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					this.display(); // Re-render the settings tab
 				});
 			});
+	}
+}
+
+class ConfirmationModal extends Modal {
+	plugin: SpacedEverythingPlugin;
+	settingsTab: SpacedEverythingSettingTab;
+
+	constructor(app: App, plugin: SpacedEverythingPlugin) {
+		super(app);
+		this.plugin = plugin;
+		this.settingsTab = new SpacedEverythingSettingTab(app, plugin);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Confirm Action' });
+		contentEl.createEl('p', { text: 'Are you sure you want to onboard to all notes in your vault? This action cannot be undone. It is highly recommended you create a full backup of your vault prior to running this vault-wide action, in case any unexpected changes result.' });
+
+		const confirmButton = new Setting(contentEl)
+			.addButton((button) => {
+				button
+					.setButtonText('Confirm')
+					.setCta()
+					.onClick(async () => {
+						await this.settingsTab.addFrontMatterPropertiesToAllNotes();
+						this.close();
+						new Notice('All notes onboarded');
+					});
+			});
+
+		const cancelButton = new Setting(contentEl)
+			.addButton((button) => {
+				button
+					.setButtonText('Cancel')
+					.onClick(() => {
+						this.close();
+					});
+			});
+	}
+
+	onClose() {
+		this.contentEl.empty();
 	}
 }

@@ -411,8 +411,15 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				cb.setIcon('cross')
 					.setTooltip('Delete spacing method')
 					.onClick(async () => {
+						const name = spacingMethod.name;
+						const isInUse = this.plugin.settings.contexts.some(
+							(context) => context.spacingMethodName === name
+						);
+
 						if (this.plugin.settings.spacingMethods.length === 1) {
 							new Notice('Cannot delete the last spacing method');
+						} else if (isInUse) {
+							new Notice(`Spacing method in use by one or more contexts, cannot delete`);
 						} else {
 							this.plugin.settings.spacingMethods.splice(index, 1);
 							await this.plugin.saveSettings();

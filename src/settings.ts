@@ -410,12 +410,16 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			// more clearly distinct from review options expansion::
 			.addExtraButton((cb) => {
 				cb.setIcon('cross')
-				.setTooltip('Delete spacing method')
-				.onClick(async () => {
-					this.plugin.settings.spacingMethods.splice(index, 1);
-					await this.plugin.saveSettings();
-					this.display(); // Re-render the settings tab
-				});
+					.setTooltip('Delete spacing method')
+					.onClick(async () => {
+						if (this.plugin.settings.spacingMethods.length === 1) {
+							new Notice('Cannot delete the last spacing method');
+						} else {
+							this.plugin.settings.spacingMethods.splice(index, 1);
+							await this.plugin.saveSettings();
+							this.display(); // Re-render the settings tab
+						}
+					});
 			});
 	}
 

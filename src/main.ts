@@ -182,7 +182,17 @@ export default class SpacedEverythingPlugin extends Plugin {
 		const noteDirectory = this.settings.capturedThoughtDirectory || "";
 		const newNotePath = `${noteDirectory}/${noteTitle}.md`;
 
-		const newNoteContent = this.settings.capturedThoughtNoteTemplate.replace(/{{thought}}/g, thought);
+		const templateContent = this.settings.capturedThoughtNoteTemplate;
+		const hasThoughtVariable = templateContent.includes("{{thought}}");
+
+		let newNoteContent: string;
+
+		if (hasThoughtVariable) {
+			newNoteContent = templateContent.replace(/{{thought}}/g, thought);
+		} else {
+			newNoteContent = `${templateContent}\n\n---\n\n## Thought\n${thought}\n\n`;
+			newNoteContent += 'Note: Your `Capture thought -> New note template` setting does not contain the `{{thought}}` variable, thus your captured thought was appended below your existing template. Please visit your Spaced Everything plugin settings to update the template and prevent this message from arising in the future.';
+		}
 
 		const newNoteFile = await this.app.vault.create(newNotePath, newNoteContent);
 

@@ -41,10 +41,10 @@ export default class SpacedEverythingPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.logger = new Logger(this.app, this.settings);
-		
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SpacedEverythingSettingTab(this.app, this));
-		
+
 		// Command to log the review outcome
 		this.addCommand({
 			id: 'log-review-outcome',
@@ -53,7 +53,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 				this.logReviewOutcome(editor, view);
 			}
 		});
-		
+
 		// Command to open the next review item
 		this.addCommand({
 			id: 'open-next-review-item',
@@ -63,7 +63,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			}
 		});
 
-		// Add a new command to toggle contexts for a note
+		// Command to toggle contexts for a note
 		this.addCommand({
 			id: 'toggle-note-contexts',
 			name: 'Toggle note contexts',
@@ -72,12 +72,21 @@ export default class SpacedEverythingPlugin extends Plugin {
 			}
 		});
 
-		// Add a new command to capture thoughts
+		// Command to capture thoughts
 		this.addCommand({
 			id: 'capture-thought',
 			name: 'Capture thought',
 			callback: () => {
 				this.captureThought()
+			}
+		});
+
+		// Command to update the spacing method for a note
+		this.addCommand({
+			id: 'update-spacing-method',
+			name: 'Update spacing method',
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				this.updateSpacingMethod(editor, view);
 			}
 		});
 	}
@@ -386,13 +395,31 @@ export default class SpacedEverythingPlugin extends Plugin {
 		// prompt user to select contexts
 		await this.toggleNoteContexts();
 
-		const activeSpacingMethod = this.getActiveSpacingMethod(file, frontmatter);
+		let activeSpacingMethod: SpacingMethod;
+		const spacingMethods = this.settings.spacingMethods;
+
+		// If there's only one spacing method, use that
+		if (spacingMethods.length === 1) {
+			activeSpacingMethod = spacingMethods[0];
+		} else {
+			// Prompt the user to select a spacing method
+			const spacingMethodNames = spacingMethods.map(method => method.name);
+			const selectedMethod = await suggester(spacingMethodNames, 'Select a spacing method for this note:');
+
+			if (selectedMethod) {
+				activeSpacingMethod = spacingMethods.find(method => method.name === selectedMethod)!;
+			} else {
+				new Notice('Onboarding cancelled by user.');
+				return false;
+			}
+		}
 
 		// add standard Spaced Everything frontmatter properties and values
 		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
-			frontmatter["se-interval"] = activeSpacingMethod?.defaultInterval || 1;
-			frontmatter["se-last-reviewed"] = now;
-			frontmatter["se-ease"] = activeSpacingMethod?.defaultEaseFactor; // TODO::make sure this is optional::
+			frontmatter['se-interval'] = activeSpacingMethod.defaultInterval;
+			frontmatter['se-last-reviewed'] = now;
+			frontmatter['se-ease'] = activeSpacingMethod.defaultEaseFactor;
+			frontmatter['se-method'] = activeSpacingMethod.name;
 		});
 
 		if (this.settings.logOnboardAction) {
@@ -459,26 +486,77 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	getActiveSpacingMethod(file: TFile, frontmatter: any): SpacingMethod | undefined {
-		const noteContexts = frontmatter?.['se-contexts'] || [];
+		const seMethod = frontmatter?.['se-method'];
 
-		// If no contexts are defined for the note, use the first spacing method
-		if (noteContexts.length === 0) {
-			return this.settings.spacingMethods[0];
+		// If se-method is set, try to find the corresponding spacing method
+		let activeSpacingMethod = this.settings.spacingMethods.find(method => method.name === seMethod);
+
+		// If se-method doesn't match any existing spacing method, proceed with fallback logic
+		if (!activeSpacingMethod) {
+			const noteContexts = frontmatter?.['se-contexts'] || [];
+
+			// If no contexts are defined for the note, use the first spacing method
+			if (noteContexts.length === 0) {
+				activeSpacingMethod = this.settings.spacingMethods[0];
+				new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (no context defined).`);
+				this.setFrontmatterProperty(file, 'se-method', activeSpacingMethod.name);
+				return activeSpacingMethod;
+			}
+
+			// Get the first context from the list
+			const firstContext = noteContexts[0];
+
+			// Find the spacing method associated with the first context
+			const contextSpacingMethod = this.settings.contexts.find(
+				context => context.name === firstContext
+			)?.spacingMethodName;
+
+			if (contextSpacingMethod) {
+				activeSpacingMethod = this.settings.spacingMethods.find(method => method.name === contextSpacingMethod);
+				if (activeSpacingMethod) {
+					new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (based on '${firstContext}' context).`);
+					this.setFrontmatterProperty(file, 'se-method', activeSpacingMethod.name);
+					return activeSpacingMethod;
+				}
+			}
+
+			// If no context is mapped to a spacing method, use the first spacing method
+			activeSpacingMethod = this.settings.spacingMethods[0];
+			new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (no context mapped to a spacing method).`);
+			this.setFrontmatterProperty(file, 'se-method', activeSpacingMethod.name);
+			return activeSpacingMethod;
 		}
 
-		// Find the first context that matches an active context in the settings
-		const activeContext = this.settings.contexts.find(
-			(context) => context.isActive && noteContexts.includes(context.name)
-		);
+		// If se-method matches an existing spacing method, return it
+		return activeSpacingMethod;
+	}
 
-		// If no active context is found, use the first spacing method
-		if (!activeContext) {
-			return this.settings.spacingMethods[0];
+	// Helper function to set a frontmatter property
+	private setFrontmatterProperty(file: TFile, property: string, value: any) {
+		this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+			frontmatter[property] = value;
+		});
+	}
+
+	async updateSpacingMethod(editor: Editor, view: MarkdownView) {
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice('No active file to update spacing method.');
+			return;
 		}
 
-		// Use the spacing method associated with the active context
-		const spacingMethodName = activeContext.spacingMethodName;
-		return this.settings.spacingMethods.find((method) => method.name === spacingMethodName);
+		const spacingMethodNames = this.settings.spacingMethods.map(method => method.name);
+		const selectedMethod = await suggester(spacingMethodNames, 'Select a spacing method:');
+
+		if (selectedMethod) {
+			await this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+				frontmatter['se-method'] = selectedMethod;
+			});
+
+			new Notice(`Updated spacing method to '${selectedMethod}' for ${activeFile.basename}`);
+		} else {
+			new Notice('Spacing method update cancelled by user.');
+		}
 	}
 
 	onunload() {

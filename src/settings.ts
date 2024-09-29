@@ -76,7 +76,6 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					this.plugin.settings.spacingMethods.push(newSpacingMethod);
 					await this.plugin.saveSettings();
 					this.renderSpacingMethodSetting(spacingMethodsDiv, newSpacingMethod, this.plugin.settings.spacingMethods.length - 1);
-					this.display(); // Re-render the settings tab to ensure new method shows up for context dropdown
 				})
 			);
 
@@ -107,7 +106,6 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					const newContext: Context = {
 						name: '',
 						isActive: false,
-						spacingMethodName: this.plugin.settings.spacingMethods[0].name, // Set the default spacing method name
 					};
 					this.plugin.settings.contexts.push(newContext);
 					await this.plugin.saveSettings();
@@ -350,8 +348,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			.setDesc('Configure the settings for this spacing method.');
 
 		const generalSettingsDiv = settingBody.createDiv('general-settings');
-		
-		let oldName = spacingMethod.name;
+
 		new Setting(generalSettingsDiv)
 			.setName('Name')
 			.setDesc('Enter a name for this spacing method')
@@ -367,20 +364,6 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 						}
 						await this.plugin.saveSettings();
 					});
-
-				textComponent.inputEl.addEventListener('blur', () => {
-					// Update contexts that were previously mapped to the old name
-					if (oldName && oldName !== spacingMethod.name) {
-						this.plugin.settings.contexts.forEach((context) => {
-							if (context.spacingMethodName === oldName) {
-								context.spacingMethodName = spacingMethod.name;
-							}
-						});
-						this.plugin.saveSettings();
-					}
-
-					this.display(); // Re-render the settings tab
-				});
 
 				return textComponent;
 			});
@@ -489,15 +472,8 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				cb.setIcon('cross')
 					.setTooltip('Delete spacing method')
 					.onClick(async () => {
-						const name = spacingMethod.name;
-						const isInUse = this.plugin.settings.contexts.some(
-							(context) => context.spacingMethodName === name
-						);
-
 						if (this.plugin.settings.spacingMethods.length === 1) {
 							new Notice('Cannot delete the last spacing method');
-						} else if (isInUse) {
-							new Notice(`Spacing method in use by one or more contexts, cannot delete`);
 						} else {
 							this.plugin.settings.spacingMethods.splice(index, 1);
 							await this.plugin.saveSettings();
@@ -505,10 +481,6 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 						}
 					});
 			});
-	}
-
-	private getSpacingMethodDropdownOptions(): Record<string, string> {
-		return Object.fromEntries(this.plugin.settings.spacingMethods.map((method) => [method.name, method.name]));
 	}
 
 	renderContextSetting(containerEl: HTMLElement, context: Context, index: number) {
@@ -529,15 +501,6 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					.setValue(context.isActive)
 					.onChange(async (value) => {
 						context.isActive = value;
-						await this.plugin.saveSettings();
-					})
-			)
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(this.getSpacingMethodDropdownOptions())
-					.setValue(context.spacingMethodName)
-					.onChange(async (value) => {
-						context.spacingMethodName = value;
 						await this.plugin.saveSettings();
 					})
 			)

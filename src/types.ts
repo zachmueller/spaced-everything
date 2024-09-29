@@ -2,7 +2,7 @@
 export interface Context {
 	name: string;
 	isActive: boolean;
-	spacingMethodName: string;
+	spacingMethodName?: string;
 }
 
 export interface ReviewOption {

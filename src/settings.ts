@@ -398,13 +398,16 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					spacingMethod.spacingAlgorithm = value;
 					await this.plugin.saveSettings();
+					// Update the visibility of the settings based on the selected value
+					customScriptSettingContainer.style.display = value === 'Custom' ? 'block' : 'none';
+					defaultEaseFactorSettingContainer.style.display = value === 'SuperMemo2.0' ? 'block' : 'none';
 				})
 			);
 
-		new Setting(generalSettingsDiv)
+		const customScriptSettingContainer = generalSettingsDiv.createDiv();
+		const customScriptSetting = new Setting(customScriptSettingContainer)
 			.setName('Custom script')
 			.setDesc('>>>NOT YET IMPLEMENTED<<< —— Input the location of your custom script file that implements a spacing algorithm')
-			// TODO::hide unless 'Custom Script' option set above::
 			.addText((text) =>
 				text
 				.setPlaceholder('Custom script file name')
@@ -414,13 +417,12 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					spacingMethod.customScriptFileName = value;
 					await this.plugin.saveSettings();
 				})
-				.setDisabled(spacingMethod.spacingAlgorithm !== 'Custom')
-			)
+			);
 
-		new Setting(generalSettingsDiv)
+		const defaultEaseFactorSettingContainer = generalSettingsDiv.createDiv();
+		const defaultEaseFactorSetting = new Setting(defaultEaseFactorSettingContainer)
 			.setName('Default ease factor')
 			.setDesc('The default ease factor')
-			// TODO::hide unless SuperMemo 2.0 algorithm set above::
 			.addText((text) =>
 				text
 				.setPlaceholder('Default ease factor')
@@ -434,8 +436,11 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 						new Notice('Default ease factor must be a number.');
 					}
 				})
-				.setDisabled(spacingMethod.spacingAlgorithm !== 'SuperMemo2.0')
 			);
+
+		// Set initial visibility of settings based on the current value of the 'Spacing algorithm' dropdown
+		customScriptSettingContainer.style.display = spacingMethod.spacingAlgorithm === 'Custom' ? 'block' : 'none';
+		defaultEaseFactorSettingContainer.style.display = spacingMethod.spacingAlgorithm === 'SuperMemo2.0' ? 'block' : 'none';
 
 		// Render review options for the spacing method
 		const reviewOptionsDiv = settingBody.createDiv('review-options');

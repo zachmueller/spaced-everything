@@ -417,6 +417,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					spacingMethod.customScriptFileName = value;
 					await this.plugin.saveSettings();
 				})
+				.setDisabled(true)
 			);
 
 		const defaultEaseFactorSettingContainer = generalSettingsDiv.createDiv();

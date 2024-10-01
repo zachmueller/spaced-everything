@@ -176,11 +176,33 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return content;
 	}
 
+	private async generateUniqueFilePath(filename: string, extension: string = '.md'): Promise<string> {
+		let uniqueFilename = `${filename}${extension}`;
+
+		// return initial filename, if not already taken
+		if (!(await this.app.vault.adapter.exists(uniqueFilename))) {
+			return uniqueFilename;
+		}
+
+		// iteratively add counters until find available file path
+		let counter = 1;
+		while (true) {
+			const filePath = `${filename}-${counter}${extension}`;
+			const fileExists = await this.app.vault.adapter.exists(filePath);
+
+			if (!fileExists) {
+				return filePath;
+			}
+
+			uniqueFilename = `${filename} ${counter}`;
+			counter++;
+		}
+	}
+
 	async createNewNoteFile(thought: string, now: Date): Promise<TFile> {
 		const noteTitle = this.replaceCapturedThoughtVariables(this.settings.capturedThoughtTitleTemplate, now);
-
 		const noteDirectory = this.settings.capturedThoughtDirectory || "";
-		const newNotePath = `${noteDirectory}/${noteTitle}.md`;
+		const newNotePath = await this.generateUniqueFilePath(`${noteDirectory}/${noteTitle}`);
 
 		const templateContent = this.settings.capturedThoughtNoteTemplate;
 		const hasThoughtVariable = templateContent.includes("{{thought}}");

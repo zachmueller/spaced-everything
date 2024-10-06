@@ -1,20 +1,11 @@
 # Roadmap
+I develop my ideas for how to evolve this plugin first within [my notes](https://notes.zach.nz/Spaced-Everything-plugin) then later migrate them into [GitHub Issues](https://github.com/zachmueller/spaced-everything/issues). Below I call out a few specific enhancements I have in mind, with links to their respective Issues. Beyond the list below, many bugs and small changes are also articulated in Issues. 
 
-## Shift towards Spaced Everything
+Users of the plugin are encouraged to provide input in a variety of ways. Submitting new Issues to highlight bugs or gaps in documentation helps me catch problems I missed myself. Issues are also the best mechanism for requesting new features or enhancements for the plugin. Adding a 👍 reaction to any Issues you would find most valuable can also help signal which features are most of interest by users. 
 
-After re-reading various of Andy Matuschak's notes, I want to implement a few additional things and rename this project to "Spaced Everything". For that, some new features:
-- Cloze deletions and Q/A stuff often seen throughout Andy's notes
-
-Also, some minor changes of existing code:
-- Review full code and documentation for terminology and identify better names to suit the broader scope (e.g., "review queue"). Probably toss all of this into a Glossary doc.
-- Restructure some of the plugin settings variables to ensure it's better suited for my long term plans of expanding into more customization
-
-## Later on
-Below are some further ideas for things I might want to implement in this plugin:
-- Allow for routing things from the writing inbox through different paths (e.g., tag specific templates to execute, directory to place it under, custom frontmatter properties to include, etc). One example usage of this would be Andy's [reading inbox concept](https://notes.andymatuschak.org/zDXBGEWk7msyonQ2Ngnrf8h).
-- Enable custom spacing algorithms/approaches for each different context (think about Andy's [example](https://notes.andymatuschak.org/zB92WZZ5baBHKZPPbWMbYEv) for piano exercises where he wants to capture both a subjective rating and a maximum tempo score to then influence the next spacing calculation). This would require allowing users to implement custom JavaScript to derive the updates to the key frontmatter properties used in the spacing calculation.
-- With massively different spacing contexts, should implement some easier method for switching between (or toggling) contexts active for the "Open next review note" command
-- Maybe implement my [session wrapper template](https://notes.zach.nz/Note-template---Session-wrapper-for-my-spaced-writing-practice) functionality
-- Further customization within the SuperMemo-2.0 algorithm
-- Implement other spacing algorithms
-- Time of day auto-switching between which contexts are active?
+As of today, I do not have a specific structure for deciding which aspects of the plugin to work on next. There also is no specific timeline for when I'll tackle any given Issue. This is a plugin I use in my daily workflow in both my professional and personal life, so new ideas spring up frequently and I implement changes as inspiration strikes. 
+## Highlights
+- [Cloze deletions](https://github.com/zachmueller/spaced-everything/issues/18)
+- [Custom spacing algorithms](https://github.com/zachmueller/spaced-everything/issues/24)
+- [Spaced writing session wrapper](https://github.com/zachmueller/spaced-everything/issues/26)
+- [Sample vault](https://github.com/zachmueller/spaced-everything/issues/22)

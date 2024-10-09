@@ -3,6 +3,7 @@ import { Context, ReviewOption, SpacingMethod } from './types';
 import { Logger } from './logger';
 import { SpacedEverythingPluginSettings, SpacedEverythingSettingTab } from './settings';
 import { Suggester, suggester } from './suggester';
+import { FrontmatterQueue } from './frontmatterQueue';
 
 const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	logFilePath: "", // defaults to no logging
@@ -37,10 +38,12 @@ const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 export default class SpacedEverythingPlugin extends Plugin {
 	settings: SpacedEverythingPluginSettings;
 	logger: Logger;
+	private frontmatterQueue: FrontmatterQueue;
 
 	async onload() {
 		await this.loadSettings();
 		this.logger = new Logger(this.app, this.settings);
+		this.frontmatterQueue = new FrontmatterQueue(this.app);
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SpacedEverythingSettingTab(this.app, this));
@@ -68,7 +71,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			id: 'toggle-note-contexts',
 			name: 'Toggle note contexts',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				this.toggleNoteContexts(editor, view)
+				this.toggleNoteContextsWrapper(editor, view)
 			}
 		});
 
@@ -90,6 +93,16 @@ export default class SpacedEverythingPlugin extends Plugin {
 			}
 		});
 	}
+
+    // Helper method to add updates to the queue
+    queueFrontmatterUpdate(file: TFile, updates: Record<string, any>) {
+        this.frontmatterQueue.add(file, updates);
+    }
+
+    // Helper method to process all queued updates
+    async processFrontmatterQueue() {
+        await this.frontmatterQueue.process();
+    }
 
 	async captureThought() {
 		// craft modal for collecting user input
@@ -138,14 +151,12 @@ export default class SpacedEverythingPlugin extends Plugin {
 			let aliases: string[] = [];
 			await this.onboardNoteToSpacedEverything(newNoteFile, {});
 
-			// TODO::need to refactor how I handle note frontmatter generally across the code base for maintainability::
-			await this.app.fileManager.processFrontMatter(newNoteFile, async (frontmatter: any) => {
-				frontmatter["se-capture-time"] = Math.floor(now.getTime() / 1000).toString();
-				if (this.settings.includeShortThoughtInAlias && thought 
-					&& thought.length <= this.settings.shortCapturedThoughtThreshold) {
-					frontmatter["aliases"] = [thought];
-				}
+			await this.frontmatterQueue.add(newNoteFile, {
+				"se-capture-time": Math.floor(now.getTime() / 1000).toString(),
+				"aliases": this.settings.includeShortThoughtInAlias && thought
+					&& thought.length <= this.settings.shortCapturedThoughtThreshold ? [thought] : undefined
 			});
+			await this.processFrontmatterQueue();
 		};
 
 		textArea.addEventListener("keydown", (event) => {
@@ -236,20 +247,25 @@ export default class SpacedEverythingPlugin extends Plugin {
 		await this.app.workspace.openLinkText(newNoteFile.path, newNoteFile.path, true, { active: true });
 	}
 
-	async toggleNoteContexts(editor?: Editor, view?: MarkdownView) {
+	async toggleNoteContextsWrapper(editor?: Editor, view?: MarkdownView) {
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file to toggle contexts.");
+			return;
+		}
+
+		await this.toggleNoteContexts(activeFile);
+		await this.processFrontmatterQueue();
+	}
+
+	async toggleNoteContexts(file: TFile) {
 		if (this.settings.contexts.length === 0) {
 			// no contexts to toggle
 			new Notice('Spaced Everything: No contexts defined');
 			return;
 		}
 
-		const activeFile = this.app.workspace.getActiveFile()
-		if (!activeFile) {
-			new Notice("No active file to toggle contexts.");
-			return;
-		}
-
-		const frontmatter = this.app.metadataCache.getFileCache(activeFile)?.frontmatter;
+		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 		const currentContexts = frontmatter && frontmatter["se-contexts"] ? frontmatter["se-contexts"] : [];
 
 		const choices = this.settings.contexts.map(context => {
@@ -267,8 +283,8 @@ export default class SpacedEverythingPlugin extends Plugin {
 				updatedContexts.push(selectedContext);
 			}
 
-			await this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-				frontmatter["se-contexts"] = updatedContexts;
+			await this.frontmatterQueue.add(file, {
+				"se-contexts": updatedContexts
 			});
 		}
 	}
@@ -288,7 +304,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		const noteOnboarded = await this.isNoteOnboarded(activeFile, frontmatter);
 
 		if (noteOnboarded) {
-			const activeSpacingMethod = this.getActiveSpacingMethod(activeFile, frontmatter);
+			const activeSpacingMethod = await this.getActiveSpacingMethod(activeFile, frontmatter);
 			if (!activeSpacingMethod) {
 				new Notice('Error: No active spacing method found for this note.');
 				return;
@@ -307,25 +323,28 @@ export default class SpacedEverythingPlugin extends Plugin {
 				await this.removeNoteFromSpacedEverything(activeFile, frontmatter);
 			} else {
 				const selectedOption = activeSpacingMethod.reviewOptions.find((option) => option.name === reviewResult);
-				
+
 				// check whether valid option selected
 				if (!selectedOption) {
 					new Notice('Error: Review option not found in settings. Please check your settings.');
 					return;
 				}
-				
+
 				// check whether valid review quality score set for 
 				if (selectedOption.score === undefined || selectedOption.score === null) {
 					new Notice(`Error: Review option score is not set in settings. Please set a score for the selected review option: ${selectedOption.name}`);
 					return;
 				}
-				
+
 				// perform action to update the interval
-				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption.score, now);
+				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption.score, now, activeSpacingMethod);
 			}
 		} else {
 			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
 		}
+
+		// Process all queued frontmatter updates
+		await this.processFrontmatterQueue();
 	}
 
 	private filterNotesByContext(files: TFile[]): TFile[] {
@@ -425,7 +444,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		const now = new Date().toISOString().split('.')[0];
 
 		// prompt user to select contexts
-		await this.toggleNoteContexts();
+		await this.toggleNoteContexts(file);
 
 		let activeSpacingMethod: SpacingMethod;
 		const spacingMethods = this.settings.spacingMethods;
@@ -447,11 +466,11 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 
 		// add standard Spaced Everything frontmatter properties and values
-		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
-			frontmatter['se-interval'] = activeSpacingMethod.defaultInterval;
-			frontmatter['se-last-reviewed'] = now;
-			frontmatter['se-ease'] = activeSpacingMethod.defaultEaseFactor;
-			frontmatter['se-method'] = activeSpacingMethod.name;
+		await this.queueFrontmatterUpdate(file, {
+			'se-interval': activeSpacingMethod.defaultInterval,
+			'se-last-reviewed': now,
+			'se-ease': activeSpacingMethod.defaultEaseFactor,
+			'se-method': activeSpacingMethod.name
 		});
 
 		if (this.settings.logOnboardAction) {
@@ -463,11 +482,11 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	async removeNoteFromSpacedEverything(file: TFile, frontmatter: any): Promise<void> {
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			delete frontmatter['se-interval'];
-			delete frontmatter['se-ease'];
-			delete frontmatter['se-last-reviewed'];
-			delete frontmatter['se-contexts'];
+		await this.queueFrontmatterUpdate(file, {
+			'se-interval': undefined,
+			'se-ease': undefined,
+			'se-last-reviewed': undefined,
+			'se-contexts': undefined
 		});
 		new Notice(`Removed note from Spaced Everything: ${file.basename}`);
 		if (this.settings.logRemoveAction) {
@@ -475,13 +494,11 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
-	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, now: string): Promise<{ newInterval: number; newEaseFactor: number; }> {
+	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, now: string, activeSpacingMethod: SpacingMethod): Promise<{ newInterval: number; newEaseFactor: number; }> {
 		let prevInterval = 1;
 		let prevEaseFactor = 2.5;
 		let newInterval = 0;
 		let newEaseFactor = 0;
-
-		const activeSpacingMethod = this.getActiveSpacingMethod(file, frontmatter);
 
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 			// Get the previous interval and ease factor from the frontmatter
@@ -501,14 +518,16 @@ export default class SpacedEverythingPlugin extends Plugin {
 				newInterval = 1;
 			}
 
-			// Update the frontmatter with the new interval and ease factor
-			frontmatter['se-interval'] = newInterval;
-			frontmatter['se-ease'] = newEaseFactor;
-			frontmatter['se-last-reviewed'] = now;
-
 			if (this.settings.logFilePath) {
 				this.logger.log('review', file, frontmatter, reviewScore, newInterval, newEaseFactor);
 			}
+		});
+
+		// Update the frontmatter with the new interval and ease factor
+		await this.queueFrontmatterUpdate(file, {
+			'se-interval': newInterval,
+			'se-ease': newEaseFactor,
+			'se-last-reviewed': now
 		});
 
 		// Notify the user of the interval change
@@ -517,7 +536,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return { newInterval, newEaseFactor };
 	}
 
-	getActiveSpacingMethod(file: TFile, frontmatter: any): SpacingMethod | undefined {
+	async getActiveSpacingMethod(file: TFile, frontmatter: any): Promise<SpacingMethod | undefined> {
 		const seMethod = frontmatter?.['se-method'];
 
 		// If se-method is set, try to find the corresponding spacing method
@@ -531,7 +550,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			if (noteContexts.length === 0) {
 				activeSpacingMethod = this.settings.spacingMethods[0];
 				new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (no context defined).`);
-				this.setFrontmatterProperty(file, 'se-method', activeSpacingMethod.name);
+				await this.queueFrontmatterUpdate(file, {'se-method': activeSpacingMethod.name});
 				return activeSpacingMethod;
 			}
 
@@ -547,7 +566,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 				activeSpacingMethod = this.settings.spacingMethods.find(method => method.name === contextSpacingMethod);
 				if (activeSpacingMethod) {
 					new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (based on '${firstContext}' context).`);
-					this.setFrontmatterProperty(file, 'se-method', activeSpacingMethod.name);
+					await this.queueFrontmatterUpdate(file, {'se-method': activeSpacingMethod.name});
 					return activeSpacingMethod;
 				}
 			}
@@ -555,19 +574,12 @@ export default class SpacedEverythingPlugin extends Plugin {
 			// If no context is mapped to a spacing method, use the first spacing method
 			activeSpacingMethod = this.settings.spacingMethods[0];
 			new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (no context mapped to a spacing method).`);
-			this.setFrontmatterProperty(file, 'se-method', activeSpacingMethod.name);
+			await this.queueFrontmatterUpdate(file, {'se-method': activeSpacingMethod.name});
 			return activeSpacingMethod;
 		}
 
 		// If se-method matches an existing spacing method, return it
 		return activeSpacingMethod;
-	}
-
-	// Helper function to set a frontmatter property
-	private setFrontmatterProperty(file: TFile, property: string, value: any) {
-		this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			frontmatter[property] = value;
-		});
 	}
 
 	async updateSpacingMethod(editor: Editor, view: MarkdownView) {
@@ -581,8 +593,8 @@ export default class SpacedEverythingPlugin extends Plugin {
 		const selectedMethod = await suggester(spacingMethodNames, 'Select a spacing method:');
 
 		if (selectedMethod) {
-			await this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-				frontmatter['se-method'] = selectedMethod;
+			await this.queueFrontmatterUpdate(activeFile, {
+				'se-method': selectedMethod
 			});
 
 			new Notice(`Updated spacing method to '${selectedMethod}' for ${activeFile.basename}`);

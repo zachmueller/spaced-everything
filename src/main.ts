@@ -32,7 +32,8 @@ const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	includeShortThoughtInAlias: true,
 	shortCapturedThoughtThreshold: 200,
 	openCapturedThoughtInNewTab: false,
-	onboardingExcludedFolders: []
+	onboardingExcludedFolders: [],
+	timestampTimeZone: "UTC",
 }
 
 export default class SpacedEverythingPlugin extends Plugin {
@@ -103,6 +104,56 @@ export default class SpacedEverythingPlugin extends Plugin {
     async processFrontmatterQueue() {
         await this.frontmatterQueue.process();
     }
+
+	// Helper method to format timestamps with time zone info
+	private formatTimestamp(date: Date): string {
+		switch (this.settings.timestampTimeZone) {
+			case "Local":
+				// Format as local time with timezone offset
+				const year = date.getFullYear();
+				const month = String(date.getMonth() + 1).padStart(2, '0');
+				const day = String(date.getDate()).padStart(2, '0');
+				const hours = String(date.getHours()).padStart(2, '0');
+				const minutes = String(date.getMinutes()).padStart(2, '0');
+				const seconds = String(date.getSeconds()).padStart(2, '0');
+
+				// Calculate timezone offset
+				const tzOffset = -date.getTimezoneOffset();
+				const offsetHours = Math.abs(Math.floor(tzOffset / 60)).toString().padStart(2, '0');
+				const offsetMinutes = Math.abs(tzOffset % 60).toString().padStart(2, '0');
+				const offsetSign = tzOffset >= 0 ? '+' : '-';
+
+				return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetSign}${offsetHours}:${offsetMinutes}`;
+
+			case "UTC":
+			default:
+				// For UTC, keep full ISO string but remove milliseconds
+				return date.toISOString().replace(/\.\d{3}/, '');
+		}
+	}
+
+	// Helper function to parse timestamps consistently. Necessary since
+	// my original implementation left out time zone info but I later added
+	// in functionality to write out timestamps in different time zones.
+	private parseTimestamp(timestamp: string): Date {
+		if (!timestamp) return new Date(0);
+
+		// Check for timezone indicators that appear after the "T":
+		// 1. Ends with Z
+		// 2. Has a + or - after the T character
+		if (/Z$|T.*[+-]/.test(timestamp)) {
+			return new Date(timestamp);
+		} else {
+			// No timezone info - assume based on user setting:
+			switch (this.settings.timestampTimeZone) {
+				case "Local":
+					return new Date(timestamp);
+				case "UTC":
+				default:
+					return new Date(timestamp + "Z");
+			}
+		}
+	}
 
 	async captureThought() {
 		// craft modal for collecting user input
@@ -297,7 +348,8 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 
 		// capture current timestamp
-		const now = new Date().toISOString().split('.')[0];
+		const now = new Date();
+		const nowFormatted = this.formatTimestamp(now);
 
 		// check whether note already onboarded to Spaced Everything
 		const frontmatter = this.app.metadataCache.getFileCache(activeFile)?.frontmatter;
@@ -337,7 +389,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 				}
 
 				// perform action to update the interval
-				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption.score, now, activeSpacingMethod);
+				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption.score, nowFormatted, activeSpacingMethod);
 			}
 		} else {
 			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
@@ -394,7 +446,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 				const currentTime = Date.now();
 				const timeDiff = metadata["se-interval"] * 24 * 60 * 60 * 1000;
 				const lastReviewed = metadata["se-last-reviewed"]
-					? new Date(metadata["se-last-reviewed"]).getTime()
+					? this.parseTimestamp(metadata["se-last-reviewed"]).getTime()
 					: 0;
 
 				const isDue = currentTime > (lastReviewed + timeDiff);
@@ -406,10 +458,10 @@ export default class SpacedEverythingPlugin extends Plugin {
 				const bMetadata = this.app.metadataCache.getFileCache(b)?.frontmatter;
 
 				const aLastReviewed = aMetadata?.["se-last-reviewed"]
-					? new Date(aMetadata["se-last-reviewed"]).getTime()
+					? this.parseTimestamp(aMetadata["se-last-reviewed"]).getTime()
 					: 0;
 				const bLastReviewed = bMetadata?.["se-last-reviewed"]
-					? new Date(bMetadata["se-last-reviewed"]).getTime()
+					? this.parseTimestamp(bMetadata["se-last-reviewed"]).getTime()
 					: 0;
 
 				const aInterval = aMetadata?.["se-interval"] * 24 * 60 * 60 * 1000;
@@ -441,7 +493,8 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	async onboardNoteToSpacedEverything(file: TFile, frontmatter: any): Promise<boolean> {
-		const now = new Date().toISOString().split('.')[0];
+		const now = new Date()
+		const nowFormatted = this.formatTimestamp(now);
 
 		// prompt user to select contexts
 		await this.toggleNoteContexts(file);
@@ -468,7 +521,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		// add standard Spaced Everything frontmatter properties and values
 		await this.queueFrontmatterUpdate(file, {
 			'se-interval': activeSpacingMethod.defaultInterval,
-			'se-last-reviewed': now,
+			'se-last-reviewed': nowFormatted,
 			'se-ease': activeSpacingMethod.defaultEaseFactor,
 			'se-method': activeSpacingMethod.name
 		});
@@ -494,7 +547,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
-	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, now: string, activeSpacingMethod: SpacingMethod): Promise<{ newInterval: number; newEaseFactor: number; }> {
+	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, nowFormatted: string, activeSpacingMethod: SpacingMethod): Promise<{ newInterval: number; newEaseFactor: number; }> {
 		let prevInterval = 1;
 		let prevEaseFactor = 2.5;
 		let newInterval = 0;
@@ -527,7 +580,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		await this.queueFrontmatterUpdate(file, {
 			'se-interval': newInterval,
 			'se-ease': newEaseFactor,
-			'se-last-reviewed': now
+			'se-last-reviewed': nowFormatted
 		});
 
 		// Notify the user of the interval change

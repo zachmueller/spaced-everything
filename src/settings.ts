@@ -17,6 +17,7 @@ interface SpacedEverythingPluginSettings {
 	shortCapturedThoughtThreshold: number;
 	openCapturedThoughtInNewTab: boolean;
 	onboardingExcludedFolders: string[];
+	timestampTimeZone: string;
 }
 
 export type { SpacedEverythingPluginSettings };
@@ -113,9 +114,26 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				})
 			);
 
-		// logging
+		// Vault-wide settings
+		new Setting(containerEl).setName('Vault-wide settings').setHeading();
+
+		new Setting(containerEl)
+		.setName('Timestamp time zone')
+		.setDesc('Choose the timezone format for timestamps in the se-last-reviewed field and other timestamp fields. UTC stores timestamps in Coordinated Universal Time, while Local uses your system\'s local timezone. Note: Changing this setting will only affect new timestamps; existing timestamps will remain in their current format. Timestamps where the time zone is ambiguous (e.g., updated manually via Obsidian UI) uses this setting to apply a time zone assumption.')
+		.addDropdown(dropdown => dropdown
+			.addOptions({
+				'UTC': 'UTC (Coordinated Universal Time)',
+				'Local': 'Local (System timezone)'
+			})
+			.setValue(this.plugin.settings.timestampTimeZone)
+			.onChange(async (value) => {
+				this.plugin.settings.timestampTimeZone = value;
+				await this.plugin.saveSettings();
+			}));
+
+		// Logging settings
 		new Setting(containerEl).setName('Logging').setHeading();
-		
+
 		new Setting(containerEl)
 			.setName('Log spaced everything practice activity')
 			.setDesc('Choose the file path where Spaced Everything logs are stored. Leave blank to not capture logs. Note: output data format is JSONL (i.e., `.jsonl` filename extension recommended).')
@@ -127,7 +145,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				})
 			);
-		
+
 		new Setting(containerEl)
 			.setName('Log action: note onboarded to Spaced Everything')
 			.setDesc('Whether to log the action of onboarding a new note to Spaced Everything')

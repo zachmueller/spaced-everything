@@ -1,5 +1,5 @@
 # Roadmap
-I develop my ideas for how to evolve this plugin first within [my notes](https://notes.zach.nz/Spaced-Everything-plugin) then later migrate them into [GitHub Issues](https://github.com/zachmueller/spaced-everything/issues). Below I call out a few specific enhancements I have in mind, with links to their respective Issues. Beyond the list below, many bugs and small changes are also articulated in Issues. 
+I develop my ideas for how to evolve this plugin first within [my notes](https://notes.zach.nz/#t=Spaced-Everything-plugin) then later migrate them into [GitHub Issues](https://github.com/zachmueller/spaced-everything/issues). Below I call out a few specific enhancements I have in mind, with links to their respective Issues. Beyond the list below, many bugs and small changes are also articulated in Issues. 
 
 Users of the plugin are encouraged to provide input in a variety of ways. Submitting new Issues to highlight bugs or gaps in documentation helps me catch problems I missed myself. Issues are also the best mechanism for requesting new features or enhancements for the plugin. Adding a 👍 reaction to any Issues you would find most valuable can also help signal which features are most of interest by users. 
 

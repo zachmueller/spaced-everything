@@ -4,6 +4,15 @@ import { Logger } from './logger';
 import { SpacedEverythingPluginSettings, SpacedEverythingSettingTab } from './settings';
 import { Suggester, suggester } from './suggester';
 import { FrontmatterQueue } from './frontmatterQueue';
+import {
+	FM_PROPERTY_NAME_INTERVAL,
+	FM_PROPERTY_NAME_LAST_REVIEWED,
+	FM_PROPERTY_NAME_EASE,
+	FM_PROPERTY_NAME_METHOD,
+	FM_PROPERTY_NAME_CONTEXTS,
+	FM_PROPERTY_NAME_CAPTURE_TIME,
+	FM_PROPERTY_NAME_ALIASES
+} from './constants';
 
 const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	logFilePath: "", // defaults to no logging
@@ -203,8 +212,8 @@ export default class SpacedEverythingPlugin extends Plugin {
 			await this.onboardNoteToSpacedEverything(newNoteFile, {});
 
 			await this.frontmatterQueue.add(newNoteFile, {
-				"se-capture-time": Math.floor(now.getTime() / 1000).toString(),
-				"aliases": this.settings.includeShortThoughtInAlias && thought
+				[FM_PROPERTY_NAME_CAPTURE_TIME]: Math.floor(now.getTime() / 1000).toString(),
+				[FM_PROPERTY_NAME_ALIASES]: this.settings.includeShortThoughtInAlias && thought
 					&& thought.length <= this.settings.shortCapturedThoughtThreshold ? [thought] : undefined
 			});
 			await this.processFrontmatterQueue();
@@ -317,7 +326,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
-		const currentContexts = frontmatter && frontmatter["se-contexts"] ? frontmatter["se-contexts"] : [];
+		const currentContexts = frontmatter && frontmatter[FM_PROPERTY_NAME_CONTEXTS] ? frontmatter[FM_PROPERTY_NAME_CONTEXTS] : [];
 
 		const choices = this.settings.contexts.map(context => {
 			const isSelected = currentContexts.includes(context.name);
@@ -335,7 +344,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 			}
 
 			await this.frontmatterQueue.add(file, {
-				"se-contexts": updatedContexts
+				[FM_PROPERTY_NAME_CONTEXTS]: updatedContexts
 			});
 		}
 	}
@@ -417,7 +426,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 		return files.filter(file => {
 			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
-			const noteContexts = frontmatter?.['se-contexts'] || [];
+			const noteContexts = frontmatter?.[FM_PROPERTY_NAME_CONTEXTS] || [];
 
 			// Case 3: If noteContexts is empty, always include
 			if (noteContexts.length === 0) {
@@ -441,12 +450,12 @@ export default class SpacedEverythingPlugin extends Plugin {
 		const filteredPages = this.filterNotesByContext(files)
 			.filter(file => {
 				const metadata = this.app.metadataCache.getFileCache(file)?.frontmatter;
-				if (!metadata || metadata["se-interval"] === undefined) return false;
+				if (!metadata || metadata[FM_PROPERTY_NAME_INTERVAL] === undefined) return false;
 
 				const currentTime = Date.now();
-				const timeDiff = metadata["se-interval"] * 24 * 60 * 60 * 1000;
-				const lastReviewed = metadata["se-last-reviewed"]
-					? this.parseTimestamp(metadata["se-last-reviewed"]).getTime()
+				const timeDiff = metadata[FM_PROPERTY_NAME_INTERVAL] * 24 * 60 * 60 * 1000;
+				const lastReviewed = metadata[FM_PROPERTY_NAME_LAST_REVIEWED]
+					? this.parseTimestamp(metadata[FM_PROPERTY_NAME_LAST_REVIEWED]).getTime()
 					: 0;
 
 				const isDue = currentTime > (lastReviewed + timeDiff);
@@ -457,15 +466,15 @@ export default class SpacedEverythingPlugin extends Plugin {
 				const aMetadata = this.app.metadataCache.getFileCache(a)?.frontmatter;
 				const bMetadata = this.app.metadataCache.getFileCache(b)?.frontmatter;
 
-				const aLastReviewed = aMetadata?.["se-last-reviewed"]
-					? this.parseTimestamp(aMetadata["se-last-reviewed"]).getTime()
+				const aLastReviewed = aMetadata?.[FM_PROPERTY_NAME_LAST_REVIEWED]
+					? this.parseTimestamp(aMetadata[FM_PROPERTY_NAME_LAST_REVIEWED]).getTime()
 					: 0;
-				const bLastReviewed = bMetadata?.["se-last-reviewed"]
-					? this.parseTimestamp(bMetadata["se-last-reviewed"]).getTime()
+				const bLastReviewed = bMetadata?.[FM_PROPERTY_NAME_LAST_REVIEWED]
+					? this.parseTimestamp(bMetadata[FM_PROPERTY_NAME_LAST_REVIEWED]).getTime()
 					: 0;
 
-				const aInterval = aMetadata?.["se-interval"] * 24 * 60 * 60 * 1000;
-				const bInterval = bMetadata?.["se-interval"] * 24 * 60 * 60 * 1000;
+				const aInterval = aMetadata?.[FM_PROPERTY_NAME_INTERVAL] * 24 * 60 * 60 * 1000;
+				const bInterval = bMetadata?.[FM_PROPERTY_NAME_INTERVAL] * 24 * 60 * 60 * 1000;
 
 				const aDueTime = aLastReviewed + (aInterval || 0);
 				const bDueTime = bLastReviewed + (bInterval || 0);
@@ -489,7 +498,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	async isNoteOnboarded(file: TFile, frontmatter: any): Promise<boolean> {
-		return Object.keys(frontmatter || {}).includes('se-interval');
+		return Object.keys(frontmatter || {}).includes(FM_PROPERTY_NAME_INTERVAL);
 	}
 
 	async onboardNoteToSpacedEverything(file: TFile, frontmatter: any): Promise<boolean> {
@@ -520,10 +529,10 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 		// add standard Spaced Everything frontmatter properties and values
 		await this.queueFrontmatterUpdate(file, {
-			'se-interval': activeSpacingMethod.defaultInterval,
-			'se-last-reviewed': nowFormatted,
-			'se-ease': activeSpacingMethod.defaultEaseFactor,
-			'se-method': activeSpacingMethod.name
+			[FM_PROPERTY_NAME_INTERVAL]: activeSpacingMethod.defaultInterval,
+			[FM_PROPERTY_NAME_LAST_REVIEWED]: nowFormatted,
+			[FM_PROPERTY_NAME_EASE]: activeSpacingMethod.defaultEaseFactor,
+			[FM_PROPERTY_NAME_METHOD]: activeSpacingMethod.name
 		});
 
 		if (this.settings.logOnboardAction) {
@@ -536,10 +545,11 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 	async removeNoteFromSpacedEverything(file: TFile, frontmatter: any): Promise<void> {
 		await this.queueFrontmatterUpdate(file, {
-			'se-interval': undefined,
-			'se-ease': undefined,
-			'se-last-reviewed': undefined,
-			'se-contexts': undefined
+			[FM_PROPERTY_NAME_INTERVAL]: undefined,
+			[FM_PROPERTY_NAME_EASE]: undefined,
+			[FM_PROPERTY_NAME_LAST_REVIEWED]: undefined,
+			[FM_PROPERTY_NAME_CONTEXTS]: undefined,
+			[FM_PROPERTY_NAME_METHOD]: undefined
 		});
 		new Notice(`Removed note from Spaced Everything: ${file.basename}`);
 		if (this.settings.logRemoveAction) {
@@ -555,8 +565,8 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
 			// Get the previous interval and ease factor from the frontmatter
-			prevInterval = Number(frontmatter['se-interval'] || activeSpacingMethod?.defaultInterval || 1);
-			prevEaseFactor = Number(frontmatter['se-ease'] || activeSpacingMethod?.defaultEaseFactor || 2.5);
+			prevInterval = Number(frontmatter[FM_PROPERTY_NAME_INTERVAL] || activeSpacingMethod?.defaultInterval || 1);
+			prevEaseFactor = Number(frontmatter[FM_PROPERTY_NAME_EASE] || activeSpacingMethod?.defaultEaseFactor || 2.5);
 
 			// Calculate the new ease factor based on the review score
 			newEaseFactor = prevEaseFactor + (0.1 - (5 - reviewScore) * (0.08 + (5 - reviewScore) * 0.02));
@@ -578,9 +588,9 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 		// Update the frontmatter with the new interval and ease factor
 		await this.queueFrontmatterUpdate(file, {
-			'se-interval': newInterval,
-			'se-ease': newEaseFactor,
-			'se-last-reviewed': nowFormatted
+			[FM_PROPERTY_NAME_INTERVAL]: newInterval,
+			[FM_PROPERTY_NAME_EASE]: newEaseFactor,
+			[FM_PROPERTY_NAME_LAST_REVIEWED]: nowFormatted
 		});
 
 		// Notify the user of the interval change
@@ -590,20 +600,20 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	async getActiveSpacingMethod(file: TFile, frontmatter: any): Promise<SpacingMethod | undefined> {
-		const seMethod = frontmatter?.['se-method'];
+		const seMethod = frontmatter?.[FM_PROPERTY_NAME_METHOD];
 
-		// If se-method is set, try to find the corresponding spacing method
+		// If spacing method is set, try to find the corresponding spacing method
 		let activeSpacingMethod = this.settings.spacingMethods.find(method => method.name === seMethod);
 
-		// If se-method doesn't match any existing spacing method, proceed with fallback logic
+		// If spacing method doesn't match any existing spacing method, proceed with fallback logic
 		if (!activeSpacingMethod) {
-			const noteContexts = frontmatter?.['se-contexts'] || [];
+			const noteContexts = frontmatter?.[FM_PROPERTY_NAME_CONTEXTS] || [];
 
 			// If no contexts are defined for the note, use the first spacing method
 			if (noteContexts.length === 0) {
 				activeSpacingMethod = this.settings.spacingMethods[0];
-				new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (no context defined).`);
-				await this.queueFrontmatterUpdate(file, {'se-method': activeSpacingMethod.name});
+				new Notice(`Set FM_PROPERTY_NAME_METHOD to '${activeSpacingMethod.name}' for this note (no context defined).`);
+				await this.queueFrontmatterUpdate(file, {FM_PROPERTY_NAME_METHOD: activeSpacingMethod.name});
 				return activeSpacingMethod;
 			}
 
@@ -618,20 +628,20 @@ export default class SpacedEverythingPlugin extends Plugin {
 			if (contextSpacingMethod) {
 				activeSpacingMethod = this.settings.spacingMethods.find(method => method.name === contextSpacingMethod);
 				if (activeSpacingMethod) {
-					new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (based on '${firstContext}' context).`);
-					await this.queueFrontmatterUpdate(file, {'se-method': activeSpacingMethod.name});
+					new Notice(`Set FM_PROPERTY_NAME_METHOD to '${activeSpacingMethod.name}' for this note (based on '${firstContext}' context).`);
+					await this.queueFrontmatterUpdate(file, {FM_PROPERTY_NAME_METHOD: activeSpacingMethod.name});
 					return activeSpacingMethod;
 				}
 			}
 
 			// If no context is mapped to a spacing method, use the first spacing method
 			activeSpacingMethod = this.settings.spacingMethods[0];
-			new Notice(`Set 'se-method' to '${activeSpacingMethod.name}' for this note (no context mapped to a spacing method).`);
-			await this.queueFrontmatterUpdate(file, {'se-method': activeSpacingMethod.name});
+			new Notice(`Set FM_PROPERTY_NAME_METHOD to '${activeSpacingMethod.name}' for this note (no context mapped to a spacing method).`);
+			await this.queueFrontmatterUpdate(file, {FM_PROPERTY_NAME_METHOD: activeSpacingMethod.name});
 			return activeSpacingMethod;
 		}
 
-		// If se-method matches an existing spacing method, return it
+		// If spacing method matches an existing spacing method, return it
 		return activeSpacingMethod;
 	}
 
@@ -647,7 +657,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 
 		if (selectedMethod) {
 			await this.queueFrontmatterUpdate(activeFile, {
-				'se-method': selectedMethod
+				FM_PROPERTY_NAME_METHOD: selectedMethod
 			});
 
 			new Notice(`Updated spacing method to '${selectedMethod}' for ${activeFile.basename}`);

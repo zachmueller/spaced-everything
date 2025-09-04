@@ -1,6 +1,11 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath, Modal, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { Context, ReviewOption, SpacingMethod } from './types';
 import SpacedEverythingPlugin from './main';
+import {
+	FM_PROPERTY_NAME_INTERVAL,
+	FM_PROPERTY_NAME_LAST_REVIEWED,
+	FM_PROPERTY_NAME_EASE
+} from './constants';
 
 interface SpacedEverythingPluginSettings {
 	logFilePath: string;
@@ -339,15 +344,15 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 	async addFrontMatterPropertiesToNote(file: TFile) {
 		const frontMatter = this.app.metadataCache.getCache(file.path)?.frontmatter;
 		const modifiedFrontMatter = {
-			'se-interval': frontMatter?.['se-interval'] || this.plugin.settings.spacingMethods[0].defaultInterval,
-			'se-last-reviewed': frontMatter?.['se-last-reviewed'] || new Date().toISOString().split('.')[0],
-			'se-ease': frontMatter?.['se-ease'] || this.plugin.settings.spacingMethods[0].defaultEaseFactor,
+			[FM_PROPERTY_NAME_INTERVAL]: frontMatter?.[FM_PROPERTY_NAME_INTERVAL] || this.plugin.settings.spacingMethods[0].defaultInterval,
+			[FM_PROPERTY_NAME_LAST_REVIEWED]: frontMatter?.[FM_PROPERTY_NAME_LAST_REVIEWED] || new Date().toISOString().split('.')[0],
+			[FM_PROPERTY_NAME_EASE]: frontMatter?.[FM_PROPERTY_NAME_EASE] || this.plugin.settings.spacingMethods[0].defaultEaseFactor,
 		};
 
 		await this.app.fileManager.processFrontMatter(file, async (frontmatter: any) => {
-			frontmatter["se-interval"] = modifiedFrontMatter["se-interval"];
-			frontmatter["se-last-reviewed"] = modifiedFrontMatter["se-last-reviewed"];
-			frontmatter["se-ease"] = modifiedFrontMatter["se-ease"];
+			frontmatter[FM_PROPERTY_NAME_INTERVAL] = modifiedFrontMatter[FM_PROPERTY_NAME_INTERVAL];
+			frontmatter[FM_PROPERTY_NAME_LAST_REVIEWED] = modifiedFrontMatter[FM_PROPERTY_NAME_LAST_REVIEWED];
+			frontmatter[FM_PROPERTY_NAME_EASE] = modifiedFrontMatter[FM_PROPERTY_NAME_EASE];
 		});
 	}
 

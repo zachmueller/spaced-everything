@@ -683,15 +683,15 @@ Simple helpers, well-understood code, optional enhancements
 - [x] **types.ts: Context interface** - `types.ts` - S - Document context system
 - [x] **types.ts: ReviewOption interface** - `types.ts` - S - Document score range and effects
 - [x] **types.ts: SpacingMethod interface** - `types.ts` - M - Document complex interface with conditionals
-- [ ] **main.ts: Command handlers** - `main.ts` - L - Document 5 user-facing commands
-- [ ] **main.ts: onboardNoteToSpacedEverything()** - `main.ts` - M - Document onboarding workflow
-- [ ] **main.ts: getActiveSpacingMethod()** - `main.ts` - M - Document method fallback logic
-- [ ] **main.ts: Timestamp methods** - `main.ts` - M - Document timezone handling
-- [ ] **main.ts: Queue pattern comments** - `main.ts` - S - Inline comments for queue usage
-- [ ] **logger.ts: File header** - `logger.ts` - S - Explain JSONL logging service
-- [ ] **logger.ts: Class documentation** - `logger.ts` - M - Document logging service architecture
-- [ ] **logger.ts: log() method** - `logger.ts` - M - Document main logging entry point
-- [ ] **logger.ts: Conditional logic comments** - `logger.ts` - S - Explain privacy controls
+- [x] **main.ts: Command handlers** - `main.ts` - L - Document 5 user-facing commands
+- [x] **main.ts: onboardNoteToSpacedEverything()** - `main.ts` - M - Document onboarding workflow
+- [x] **main.ts: getActiveSpacingMethod()** - `main.ts` - M - Document method fallback logic
+- [x] **main.ts: Timestamp methods** - `main.ts` - M - Document timezone handling
+- [x] **main.ts: Queue pattern comments** - `main.ts` - S - Inline comments for queue usage
+- [x] **logger.ts: File header** - `logger.ts` - S - Explain JSONL logging service
+- [x] **logger.ts: Class documentation** - `logger.ts` - M - Document logging service architecture
+- [x] **logger.ts: log() method** - `logger.ts` - M - Document main logging entry point
+- [x] **logger.ts: Conditional logic comments** - `logger.ts` - S - Explain privacy controls
 - [ ] **settings.ts: File header** - `settings.ts` - S - Document settings UI role
 - [ ] **settings.ts: Settings interface** - `settings.ts` - L - Document all 13+ properties
 - [ ] **settings.ts: Class documentation** - `settings.ts` - M - Document settings tab

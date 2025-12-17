@@ -158,17 +158,104 @@ export default class SpacedEverythingPlugin extends Plugin {
 		});
 	}
 
-    // Helper method to add updates to the queue
+	/**
+	 * Queue frontmatter updates to prevent race conditions
+	 * 
+	 * Adds frontmatter property updates to the queue instead of applying them
+	 * immediately. This is critical for data integrity because Obsidian fires
+	 * multiple save events when users edit files, which can cause race conditions
+	 * if frontmatter is updated directly.
+	 * 
+	 * The queue batches updates by file path and deduplicates them using Object.assign,
+	 * so multiple rapid updates to the same file are merged before being written to disk.
+	 * This prevents data loss and corruption that would occur with immediate updates.
+	 * 
+	 * Always pair with processFrontmatterQueue() to actually apply the updates:
+	 * 1. Call queueFrontmatterUpdate() one or more times to add updates
+	 * 2. Call processFrontmatterQueue() to apply all queued updates atomically
+	 * 
+	 * @param file - File to queue updates for
+	 * @param updates - Frontmatter properties to add/modify (undefined = delete)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Queue review outcome updates
+	 * this.queueFrontmatterUpdate(file, { 
+	 *   'se-interval': 7,
+	 *   'se-ease': 2.5,
+	 *   'se-last-reviewed': timestamp
+	 * });
+	 * 
+	 * // Process all queued updates atomically
+	 * await this.processFrontmatterQueue();
+	 * ```
+	 */
     queueFrontmatterUpdate(file: TFile, updates: Record<string, any>) {
         this.frontmatterQueue.add(file, updates);
     }
 
-    // Helper method to process all queued updates
+	/**
+	 * Process all queued frontmatter updates atomically
+	 * 
+	 * Applies all frontmatter updates that have been queued via queueFrontmatterUpdate().
+	 * This uses the FrontmatterQueue's batching and deduplication system to ensure
+	 * updates are applied atomically without race conditions.
+	 * 
+	 * Should be called after one or more queueFrontmatterUpdate() calls to actually
+	 * write the changes to disk. Typically called at the end of command handlers
+	 * after all updates for the current operation have been queued.
+	 * 
+	 * @returns Promise that resolves when all updates have been applied
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Command handler pattern
+	 * async someCommand() {
+	 *   // Queue multiple updates
+	 *   this.queueFrontmatterUpdate(file1, { prop: value });
+	 *   this.queueFrontmatterUpdate(file2, { prop: value });
+	 *   
+	 *   // Apply all queued updates at once
+	 *   await this.processFrontmatterQueue();
+	 * }
+	 * ```
+	 */
     async processFrontmatterQueue() {
         await this.frontmatterQueue.process();
     }
 
-	// Helper method to format timestamps with time zone info
+	/**
+	 * Format a Date object as an ISO 8601 timestamp with timezone handling
+	 * 
+	 * Converts JavaScript Date objects to ISO 8601 strings with timezone information,
+	 * respecting the user's timestampTimeZone setting. This ensures consistent
+	 * timestamp storage that preserves timezone context for cross-device syncing.
+	 * 
+	 * Timezone modes:
+	 * - UTC: Appends 'Z' suffix (e.g., "2025-12-18T09:30:00Z")
+	 * - Local: Appends timezone offset (e.g., "2025-12-18T09:30:00+13:00")
+	 * 
+	 * The timezone setting affects how timestamps are stored in frontmatter:
+	 * - UTC is recommended for vault syncing across timezones
+	 * - Local is useful for single-device vaults where local context matters
+	 * 
+	 * Note: Milliseconds are removed for cleaner frontmatter (minute precision
+	 * is sufficient for spaced repetition intervals measured in days).
+	 * 
+	 * @param date - JavaScript Date object to format
+	 * @returns ISO 8601 timestamp string with timezone information
+	 * 
+	 * @example
+	 * ```typescript
+	 * // UTC mode (timestampTimeZone = "UTC")
+	 * formatTimestamp(new Date('2025-12-18T09:30:45.123Z'))
+	 * // Returns: "2025-12-18T09:30:45Z"
+	 * 
+	 * // Local mode in New Zealand (UTC+13)
+	 * formatTimestamp(new Date('2025-12-18T09:30:45.123+13:00'))
+	 * // Returns: "2025-12-18T09:30:45+13:00"
+	 * ```
+	 */
 	private formatTimestamp(date: Date): string {
 		switch (this.settings.timestampTimeZone) {
 			case "Local":
@@ -195,9 +282,45 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
-	// Helper function to parse timestamps consistently. Necessary since
-	// my original implementation left out time zone info but I later added
-	// in functionality to write out timestamps in different time zones.
+	/**
+	 * Parse timestamp strings consistently, handling legacy formats
+	 * 
+	 * Converts ISO 8601 timestamp strings back to JavaScript Date objects,
+	 * with special handling for legacy timestamps that lack timezone information.
+	 * This ensures backward compatibility with notes created before timezone
+	 * support was added to the plugin.
+	 * 
+	 * Parsing rules:
+	 * 1. If timestamp ends with 'Z': Parse as UTC (e.g., "2025-12-18T09:30:00Z")
+	 * 2. If timestamp has +/- after 'T': Parse with offset (e.g., "2025-12-18T09:30:00+13:00")
+	 * 3. If no timezone info: Interpret based on timestampTimeZone setting
+	 *    - UTC mode: Append 'Z' before parsing (assume UTC)
+	 *    - Local mode: Parse as local time (assume local timezone)
+	 * 
+	 * This function is critical for maintaining data consistency across plugin
+	 * versions and preventing interval calculations from breaking when users
+	 * change timezone settings.
+	 * 
+	 * @param timestamp - ISO 8601 timestamp string (with or without timezone)
+	 * @returns JavaScript Date object
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Modern format with timezone
+	 * parseTimestamp("2025-12-18T09:30:00Z")
+	 * // Returns: Date object for 2025-12-18 09:30:00 UTC
+	 * 
+	 * // Legacy format without timezone (UTC mode)
+	 * settings.timestampTimeZone = "UTC";
+	 * parseTimestamp("2025-12-18T09:30:00")
+	 * // Returns: Date object for 2025-12-18 09:30:00 UTC (assumed)
+	 * 
+	 * // Legacy format without timezone (Local mode)
+	 * settings.timestampTimeZone = "Local";
+	 * parseTimestamp("2025-12-18T09:30:00")
+	 * // Returns: Date object for 2025-12-18 09:30:00 in local timezone
+	 * ```
+	 */
 	private parseTimestamp(timestamp: string): Date {
 		if (!timestamp) return new Date(0);
 
@@ -218,6 +341,41 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Capture a quick thought and create a new note
+	 * 
+	 * Opens a modal where users can type a thought and create a new note with
+	 * automatic onboarding to the spaced repetition system. This workflow is
+	 * optimized for quickly capturing ideas during active thinking without
+	 * interrupting flow.
+	 * 
+	 * Workflow:
+	 * 1. Open modal with textarea for thought entry
+	 * 2. User types thought (supports template variables: {{unixtime}}, {{date}}, {{time}})
+	 * 3. On submit (Enter), create new note with thought content
+	 * 4. Automatically onboard note to spaced repetition
+	 * 5. Add capture timestamp (se-capture-time) to frontmatter
+	 * 6. Optionally add thought as alias if short (helps with quick reference)
+	 * 7. Open new note for further editing
+	 * 
+	 * The template system allows users to customize both the note title and content:
+	 * - Title template: capturedThoughtTitleTemplate (e.g., "Inbox {{unixtime}}")
+	 * - Content template: capturedThoughtNoteTemplate (e.g., "## Thought\n{{thought}}")
+	 * 
+	 * Keyboard shortcuts:
+	 * - Enter: Submit thought and create note
+	 * - Shift+Enter: Add new line within thought
+	 * - Escape: Cancel (closes modal)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // User captures: "SuperMemo algorithm adjusts ease factor based on recall quality"
+	 * // With template: "Inbox {{unixtime}}"
+	 * // Creates: "Inbox 1702841400.md"
+	 * // Content: "## Thought\nSuperMemo algorithm adjusts ease factor based on recall quality"
+	 * // Frontmatter: { se-capture-time: "1702841400", aliases: [...] }
+	 * ```
+	 */
 	async captureThought() {
 		// craft modal for collecting user input
 		const modal = new Modal(this.app);
@@ -361,6 +519,33 @@ export default class SpacedEverythingPlugin extends Plugin {
 		await this.app.workspace.openLinkText(newNoteFile.path, newNoteFile.path, true, { active: true });
 	}
 
+	/**
+	 * Toggle contexts for the active note
+	 * 
+	 * Presents a checkbox list of all configured contexts and allows the user to
+	 * select/deselect contexts for the current note. This wrapper handles getting
+	 * the active file and processing the frontmatter queue after context changes.
+	 * 
+	 * Contexts allow users to organize notes into separate review queues with
+	 * independent spacing methods. For example:
+	 * - 'learning' context: Daily reviews with aggressive spacing
+	 * - 'reference' context: Monthly reviews with conservative spacing
+	 * 
+	 * Notes can have multiple contexts and will appear in reviews when ANY of
+	 * their contexts are active (OR logic, not AND).
+	 * 
+	 * @param editor - Obsidian editor instance (optional)
+	 * @param view - Obsidian markdown view (optional)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // User has contexts: ['learning', 'reference', 'archive']
+	 * // Current note has: ['learning']
+	 * // Suggester shows: ['☑ learning', '☐ reference', '☐ archive']
+	 * // User clicks 'reference' to add it
+	 * // Updated contexts: ['learning', 'reference']
+	 * ```
+	 */
 	async toggleNoteContextsWrapper(editor?: Editor, view?: MarkdownView) {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
@@ -403,6 +588,45 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Log review outcome and update interval based on user feedback
+	 * 
+	 * This is the main review workflow command that users trigger after reviewing a note.
+	 * It presents the user with review quality options (configured per spacing method),
+	 * calculates a new interval using SuperMemo 2.0, and updates the note's frontmatter.
+	 * 
+	 * Workflow:
+	 * 1. Check if note is already onboarded (has se-interval property)
+	 * 2. If not onboarded, run onboarding workflow instead
+	 * 3. If onboarded, present review options to user
+	 * 4. Calculate new interval based on user's quality score
+	 * 5. Update frontmatter via queue (prevents race conditions)
+	 * 6. Log activity if logging is enabled
+	 * 
+	 * Special case: "Remove" option allows users to remove notes from the spaced
+	 * repetition system entirely, deleting all se-* frontmatter properties.
+	 * 
+	 * Side effects:
+	 * - Queues frontmatter updates (se-interval, se-ease, se-last-reviewed)
+	 * - Shows notices to user about interval changes
+	 * - Logs to JSONL file if logging enabled
+	 * 
+	 * @param editor - Obsidian editor instance (required by command API)
+	 * @param view - Obsidian markdown view (required by command API)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // User reviews a note and rates recall quality as "Good" (score 4)
+	 * // Old interval: 7 days, Old ease: 2.5
+	 * // → New interval: 17.5 days (7 × 2.5)
+	 * // → Notice: "Interval updated from 7 to 17.5"
+	 * 
+	 * // User can't recall a note, rates as "Again" (score 1)
+	 * // Old interval: 30 days, Old ease: 2.5
+	 * // → New interval: 1 day (reset to minimum)
+	 * // → Notice: "Interval updated from 30 to 1"
+	 * ```
+	 */
 	async logReviewOutcome(editor: Editor, view: MarkdownView) {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
@@ -555,7 +779,43 @@ export default class SpacedEverythingPlugin extends Plugin {
 		});
 	}
 
-	// Function to open the next item in the review queue
+	/**
+	 * Open the next note due for review
+	 * 
+	 * Scans the vault for notes with se-interval property, filters by active contexts,
+	 * calculates which notes are currently due for review, and opens the most overdue note.
+	 * Notes are considered due when: currentTime > (lastReviewed + interval).
+	 * 
+	 * The queue is sorted by due time (earliest first), so notes that are most overdue
+	 * are reviewed first. This prevents accumulation of overdue reviews and ensures
+	 * the most forgotten material is refreshed first.
+	 * 
+	 * Filtering logic:
+	 * 1. Only includes notes with se-interval property (onboarded notes)
+	 * 2. Applies context filtering (see filterNotesByContext for edge cases)
+	 * 3. Calculates due time: lastReviewed + (interval × 24 hours)
+	 * 4. Sorts by due time ascending (most overdue first)
+	 * 
+	 * Edge cases:
+	 * - If no notes are due: Shows "No notes to review, enjoy some fresh air!"
+	 * - If note has no se-last-reviewed: Treats as timestamp 0 (1970-01-01) so it's reviewed immediately
+	 * - Opens in current tab to avoid cluttering workspace with review tabs
+	 * 
+	 * @param editor - Obsidian editor instance (required by command API)
+	 * @param view - Obsidian markdown view (required by command API)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // User has 3 notes due for review:
+	 * // Note A: Last reviewed 10 days ago, interval 7 days → 3 days overdue
+	 * // Note B: Last reviewed 5 days ago, interval 3 days → 2 days overdue  
+	 * // Note C: Last reviewed 1 day ago, interval 1 day → 0 days overdue
+	 * // Opens Note A (most overdue)
+	 * 
+	 * // User has no notes due:
+	 * // Shows notice: "No notes to review, enjoy some fresh air!"
+	 * ```
+	 */
 	async openNextReviewItem(editor: Editor, view: MarkdownView) {
 		const vault = this.app.vault;
 		const files = vault.getMarkdownFiles();
@@ -615,6 +875,52 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return Object.keys(frontmatter || {}).includes('se-interval');
 	}
 
+	/**
+	 * Onboard a note to the spaced repetition system
+	 * 
+	 * Adds a note to Spaced Everything by setting up initial frontmatter properties
+	 * required for spaced repetition tracking. This is a multi-step process that
+	 * prompts the user to configure contexts and spacing method.
+	 * 
+	 * Onboarding workflow:
+	 * 1. Prompt user to select contexts (if contexts are configured)
+	 * 2. Prompt user to select spacing method (if multiple methods exist)
+	 * 3. Initialize frontmatter with default values:
+	 *    - se-interval: Starting interval from spacing method (typically 1 day)
+	 *    - se-last-reviewed: Current timestamp (note is "reviewed" on onboarding)
+	 *    - se-ease: Default ease factor from spacing method (typically 2.5)
+	 *    - se-method: Selected spacing method name
+	 * 4. Log onboarding action if logging enabled
+	 * 5. Show confirmation notice to user
+	 * 
+	 * The note immediately enters the review queue with its initial interval.
+	 * For example, with a 1-day interval, the note will be due for first review
+	 * tomorrow.
+	 * 
+	 * User can cancel onboarding by pressing Escape during context/method selection,
+	 * in which case the function returns false and no frontmatter is modified.
+	 * 
+	 * @param file - Note file to onboard
+	 * @param frontmatter - Current frontmatter (used for logging)
+	 * @returns Promise resolving to true if onboarded, false if cancelled
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Onboarding a new note with defaults
+	 * await onboardNoteToSpacedEverything(file, {});
+	 * // User selects context: 'learning'
+	 * // User selects method: 'SuperMemo 2.0'
+	 * // Frontmatter after onboarding:
+	 * // {
+	 * //   'se-contexts': ['learning'],
+	 * //   'se-interval': 1,
+	 * //   'se-last-reviewed': '2025-12-18T09:30:00Z',
+	 * //   'se-ease': 2.5,
+	 * //   'se-method': 'SuperMemo 2.0'
+	 * // }
+	 * // Notice: "Onboarded note to Spaced Everything: [filename]"
+	 * ```
+	 */
 	async onboardNoteToSpacedEverything(file: TFile, frontmatter: any): Promise<boolean> {
 		const now = new Date()
 		const nowFormatted = this.formatTimestamp(now);
@@ -781,6 +1087,61 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return { newInterval, newEaseFactor };
 	}
 
+	/**
+	 * Get the active spacing method for a note with cascading fallback logic
+	 * 
+	 * Determines which spacing method configuration should be used for calculating
+	 * review intervals for a specific note. This involves checking multiple sources
+	 * in priority order and automatically fixing missing or invalid configurations.
+	 * 
+	 * Resolution order (cascading fallback):
+	 * 1. se-method frontmatter property (if valid) → Use specified method
+	 * 2. First context's spacing method (if contexts exist) → Use context's method
+	 * 3. First available spacing method → Use as fallback
+	 * 
+	 * Auto-fixing behavior:
+	 * - If se-method is missing or invalid, automatically sets it to resolved method
+	 * - Shows notice to user explaining which method was selected and why
+	 * - Queues frontmatter update to prevent future resolution overhead
+	 * 
+	 * This auto-fixing approach ensures notes always have a valid spacing method
+	 * even if:
+	 * - Method was deleted from settings after note was onboarded
+	 * - Note was onboarded before method selection was implemented
+	 * - Contexts were reconfigured to use different methods
+	 * 
+	 * Edge cases:
+	 * - Note with no contexts → Uses first spacing method (global default)
+	 * - Note with contexts but context has no method → Uses first spacing method
+	 * - Invalid se-method but valid context → Uses context's method
+	 * 
+	 * @param file - Note file to get spacing method for
+	 * @param frontmatter - Note's frontmatter containing se-method and se-contexts
+	 * @returns Promise resolving to SpacingMethod object, or undefined if no methods exist
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Case 1: Valid se-method property
+	 * // frontmatter: { 'se-method': 'SuperMemo 2.0' }
+	 * const method = await getActiveSpacingMethod(file, frontmatter);
+	 * // Returns: SuperMemo 2.0 method object
+	 * 
+	 * // Case 2: Invalid se-method, has context with method
+	 * // frontmatter: { 'se-method': 'Deleted Method', 'se-contexts': ['learning'] }
+	 * // context 'learning' has spacingMethodName: 'Daily Review'
+	 * const method = await getActiveSpacingMethod(file, frontmatter);
+	 * // Returns: Daily Review method object
+	 * // Notice: "Set 'se-method' to 'Daily Review' for this note (based on 'learning' context)"
+	 * // Queues update: se-method = 'Daily Review'
+	 * 
+	 * // Case 3: No se-method, no contexts
+	 * // frontmatter: {}
+	 * const method = await getActiveSpacingMethod(file, frontmatter);
+	 * // Returns: First spacing method from settings
+	 * // Notice: "Set 'se-method' to 'SuperMemo 2.0' for this note (no context defined)"
+	 * // Queues update: se-method = 'SuperMemo 2.0'
+	 * ```
+	 */
 	async getActiveSpacingMethod(file: TFile, frontmatter: any): Promise<SpacingMethod | undefined> {
 		const seMethod = frontmatter?.['se-method'];
 
@@ -827,6 +1188,33 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return activeSpacingMethod;
 	}
 
+	/**
+	 * Update the spacing method for the active note
+	 * 
+	 * Allows users to change which spacing method (algorithm configuration) is used
+	 * for calculating review intervals for the current note. Each spacing method
+	 * defines an algorithm, default parameters, and review options.
+	 * 
+	 * This is useful when a note's optimal spacing changes over time. For example:
+	 * - Initially learning material: Use aggressive daily reviews
+	 * - Material well-learned: Switch to conservative monthly reviews
+	 * 
+	 * The se-method frontmatter property is updated immediately via the queue.
+	 * Note that changing the method doesn't reset the current interval or ease factor;
+	 * it only affects future interval calculations.
+	 * 
+	 * @param editor - Obsidian editor instance (required by command API)
+	 * @param view - Obsidian markdown view (required by command API)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // User has spacing methods: ['Daily Review', 'Weekly Review', 'Monthly Review']
+	 * // Current note has: se-method = 'Daily Review'
+	 * // User selects 'Weekly Review'
+	 * // Updates: se-method = 'Weekly Review'
+	 * // Next review will use Weekly Review's parameters (but current interval unchanged)
+	 * ```
+	 */
 	async updateSpacingMethod(editor: Editor, view: MarkdownView) {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {

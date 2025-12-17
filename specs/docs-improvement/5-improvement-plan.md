@@ -663,26 +663,26 @@ Simple helpers, well-understood code, optional enhancements
 
 ### Critical Tasks (P0) - Do First
 
-- [ ] **frontmatterQueue.ts: File header** - `frontmatterQueue.ts` - S - Explain race condition prevention architecture
-- [ ] **frontmatterQueue.ts: Class documentation** - `frontmatterQueue.ts` - M - Document queue pattern and deduplication
-- [ ] **frontmatterQueue.ts: add() method** - `frontmatterQueue.ts` - M - Document queue behavior and undefined=delete
-- [ ] **frontmatterQueue.ts: process() method** - `frontmatterQueue.ts` - M - Document atomic processing guarantee
-- [ ] **frontmatterQueue.ts: Inline comments** - `frontmatterQueue.ts` - S - Explain Object.assign merge logic
+- [x] **frontmatterQueue.ts: File header** - `frontmatterQueue.ts` - S - Explain race condition prevention architecture
+- [x] **frontmatterQueue.ts: Class documentation** - `frontmatterQueue.ts` - M - Document queue pattern and deduplication
+- [x] **frontmatterQueue.ts: add() method** - `frontmatterQueue.ts` - M - Document queue behavior and undefined=delete
+- [x] **frontmatterQueue.ts: process() method** - `frontmatterQueue.ts` - M - Document atomic processing guarantee
+- [x] **frontmatterQueue.ts: Inline comments** - `frontmatterQueue.ts` - S - Explain Object.assign merge logic
 - [ ] **main.ts: File header** - `main.ts` - M - Document main orchestrator role
 - [ ] **main.ts: Class documentation** - `main.ts` - M - Document plugin lifecycle and coordination
 - [ ] **main.ts: updateInterval() method** - `main.ts` - L - Full SuperMemo 2.0 algorithm documentation with formula
 - [ ] **main.ts: SuperMemo constants** - `main.ts` - S - Explain 0.1, 0.08, 0.02, 1.3 constants
 - [ ] **main.ts: filterNotesByContext()** - `main.ts` - M - Document 4 edge cases clearly
 - [ ] **main.ts: Context edge case comments** - `main.ts` - M - Inline comments for each filtering case
-- [ ] **types.ts: File header** - `types.ts` - S - Explain centralized type definitions
+- [x] **types.ts: File header** - `types.ts` - S - Explain centralized type definitions
 
 **Total P0 Effort:** 5.5 hours
 
 ### High Priority Tasks (P1) - Do Soon
 
-- [ ] **types.ts: Context interface** - `types.ts` - S - Document context system
-- [ ] **types.ts: ReviewOption interface** - `types.ts` - S - Document score range and effects
-- [ ] **types.ts: SpacingMethod interface** - `types.ts` - M - Document complex interface with conditionals
+- [x] **types.ts: Context interface** - `types.ts` - S - Document context system
+- [x] **types.ts: ReviewOption interface** - `types.ts` - S - Document score range and effects
+- [x] **types.ts: SpacingMethod interface** - `types.ts` - M - Document complex interface with conditionals
 - [ ] **main.ts: Command handlers** - `main.ts` - L - Document 5 user-facing commands
 - [ ] **main.ts: onboardNoteToSpacedEverything()** - `main.ts` - M - Document onboarding workflow
 - [ ] **main.ts: getActiveSpacingMethod()** - `main.ts` - M - Document method fallback logic

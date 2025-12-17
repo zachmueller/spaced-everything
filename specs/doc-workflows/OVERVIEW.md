@@ -50,7 +50,7 @@ Each workflow is designed to build on the previous step's output:
 
 ## Detailed Workflow Specifications
 
-### 1. Project Overview Workflow (`project-overview.md`)
+### 1. Project Overview Workflow (`.clinerules/workflows/docs-01-project-overview.md`)
 
 **Purpose:** Establish high-level understanding of the project's architecture, purpose, and key concepts.
 
@@ -82,7 +82,7 @@ Each workflow is designed to build on the previous step's output:
 
 ---
 
-### 2. Codebase Map Workflow (`codebase-map.md`)
+### 2. Codebase Map Workflow (`.clinerules/workflows/docs-02-codebase-map.md`)
 
 **Purpose:** Create a detailed map of all source files, their responsibilities, and relationships.
 
@@ -117,7 +117,7 @@ Each workflow is designed to build on the previous step's output:
 
 ---
 
-### 3. Documentation Audit Workflow (`documentation-audit.md`)
+### 3. Documentation Audit Workflow (`.clinerules/workflows/docs-03-documentation-audit.md`)
 
 **Purpose:** Assess the current state of documentation and identify gaps.
 
@@ -155,7 +155,7 @@ Each workflow is designed to build on the previous step's output:
 
 ---
 
-### 4. Documentation Standards Workflow (`documentation-standards.md`)
+### 4. Documentation Standards Workflow (`.clinerules/workflows/docs-04-documentation-standards.md`)
 
 **Purpose:** Define project-specific guidelines for what good documentation looks like.
 
@@ -203,7 +203,7 @@ Each workflow is designed to build on the previous step's output:
 
 ---
 
-### 5. Improvement Plan Workflow (`improvement-plan.md`)
+### 5. Improvement Plan Workflow (`.clinerules/workflows/docs-05-improvement-plan.md`)
 
 **Purpose:** Create a prioritized, actionable plan for documentation improvements.
 
@@ -242,7 +242,7 @@ Each workflow is designed to build on the previous step's output:
 
 ---
 
-### 6. Implementation Workflow (`implementation.md`)
+### 6. Implementation Workflow (`.clinerules/workflows/docs-06-implementation.md`)
 
 **Purpose:** Execute documentation improvements iteratively, tracking progress.
 
@@ -287,13 +287,12 @@ Each workflow is designed to build on the previous step's output:
 To convert this overview into working Cline workflows, complete these tasks:
 
 ### Task 1: Create Workflow Files
-- [ ] Create `.clinerules/workflows/doc-workflows/` directory
-- [ ] Create `project-overview.md` workflow file
-- [ ] Create `codebase-map.md` workflow file
-- [ ] Create `documentation-audit.md` workflow file
-- [ ] Create `documentation-standards.md` workflow file
-- [ ] Create `improvement-plan.md` workflow file
-- [ ] Create `implementation.md` workflow file
+- [ ] Create `docs-01-project-overview.md` in `.clinerules/workflows/`
+- [ ] Create `docs-02-codebase-map.md` in `.clinerules/workflows/`
+- [ ] Create `docs-03-documentation-audit.md` in `.clinerules/workflows/`
+- [ ] Create `docs-04-documentation-standards.md` in `.clinerules/workflows/`
+- [ ] Create `docs-05-improvement-plan.md` in `.clinerules/workflows/`
+- [ ] Create `docs-06-implementation.md` in `.clinerules/workflows/`
 
 ### Task 2: Define Workflow File Structure
 Each workflow file should include:
@@ -330,11 +329,11 @@ Each workflow file should include:
 - [ ] Document any workflow improvements needed
 
 ### Task 6: Documentation
-- [ ] Create README in `.clinerules/workflows/doc-workflows/`
+- [ ] Create README in `specs/doc-workflows/`
 - [ ] Document workflow execution order
 - [ ] Provide usage examples
 - [ ] Include troubleshooting guide
-- [ ] Link to this OVERVIEW.md
+- [ ] Reference the workflow files in `.clinerules/workflows/docs-*.md`
 
 ## Usage
 

@@ -692,10 +692,15 @@ Simple helpers, well-understood code, optional enhancements
 - [x] **logger.ts: Class documentation** - `logger.ts` - M - Document logging service architecture
 - [x] **logger.ts: log() method** - `logger.ts` - M - Document main logging entry point
 - [x] **logger.ts: Conditional logic comments** - `logger.ts` - S - Explain privacy controls
-- [ ] **settings.ts: File header** - `settings.ts` - S - Document settings UI role
-- [ ] **settings.ts: Settings interface** - `settings.ts` - L - Document all 13+ properties
-- [ ] **settings.ts: Class documentation** - `settings.ts` - M - Document settings tab
-- [ ] **settings.ts: Section headers** - `settings.ts` - M - Add comments dividing display() method
+- [x] **settings.ts: File header** - `settings.ts` - S - Document settings UI role
+- [x] **settings.ts: Settings interface** - `settings.ts` - L - Document all 13+ properties
+- [x] **settings.ts: Class documentation** - `settings.ts` - M - Document settings tab
+- [x] **settings.ts: Section headers** - `settings.ts` - M - Add comments dividing display() method
+- [x] **settings.ts: isFileExcluded()** - `settings.ts` - M - Document folder traversal logic
+- [x] **settings.ts: TODO expansion** - `settings.ts` - S - Expand TODOs with context
+- [x] **suggester.ts: File header** - `suggester.ts` - S - Explain reusable modal component
+- [x] **suggester.ts: Class documentation** - `suggester.ts` - M - Document modal class
+- [x] **suggester.ts: suggester() function** - `suggester.ts` - M - Document promise wrapper
 - [ ] **README.md: Installation** - `README.md` - S - Add installation instructions
 - [ ] **README.md: Getting Started** - `README.md` - M - Create walkthrough with examples
 

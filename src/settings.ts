@@ -1,27 +1,244 @@
+/**
+ * Settings - Plugin configuration UI and management
+ * 
+ * This module orchestrates the plugin's settings interface and manages
+ * configuration persistence. It renders a comprehensive settings UI with
+ * multiple sections for spacing methods, contexts, logging, and more.
+ * 
+ * The settings tab uses Obsidian's PluginSettingTab to integrate with the
+ * native settings UI. Settings are automatically saved to Obsidian's plugin
+ * data storage whenever they change.
+ * 
+ * Key exports: SpacedEverythingPluginSettings interface, SpacedEverythingSettingTab class
+ * Dependencies: Obsidian Plugin API for settings UI components
+ * Integration: Extends PluginSettingTab for seamless integration with Obsidian settings
+ */
+
 import { App, Notice, PluginSettingTab, Setting, normalizePath, Modal, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { Context, ReviewOption, SpacingMethod } from './types';
 import SpacedEverythingPlugin from './main';
 
+/**
+ * SpacedEverythingPluginSettings - Plugin configuration
+ * 
+ * These settings control all aspects of the spaced repetition system including
+ * spacing algorithms, context organization, logging behavior, and thought capture
+ * workflows. Settings are persisted in Obsidian's plugin data storage and can be
+ * modified through the plugin settings tab.
+ * 
+ * Settings are organized into logical sections:
+ * - Spacing Methods: Algorithm configurations and review options
+ * - Contexts: Note categorization and queue organization
+ * - Vault-wide: Global behaviors like timezone handling
+ * - Logging: Privacy-conscious activity logging
+ * - Capture Thought: Quick note creation workflows
+ * - Onboarding: Bulk vault-wide note onboarding (beta)
+ */
 interface SpacedEverythingPluginSettings {
+	/**
+	 * Path to JSONL log file for review activity
+	 * 
+	 * Leave empty string to disable logging. When enabled, logs review actions,
+	 * note metadata, and frontmatter properties (based on other logging settings).
+	 * 
+	 * Format: JSONL (JSON Lines) - one JSON object per line
+	 * Default: '' (disabled for privacy)
+	 */
 	logFilePath: string;
+	
+	/**
+	 * Whether to log when notes are onboarded to Spaced Everything
+	 * 
+	 * Captures the action of adding spaced repetition frontmatter to notes.
+	 * Useful for tracking vault coverage and onboarding progress.
+	 * 
+	 * Default: false
+	 */
 	logOnboardAction: boolean;
+	
+	/**
+	 * Whether to log when notes are removed from Spaced Everything
+	 * 
+	 * Captures the action of removing spaced repetition frontmatter from notes.
+	 * Useful for understanding which notes are being excluded from reviews.
+	 * 
+	 * Default: false
+	 */
 	logRemoveAction: boolean;
+	
+	/**
+	 * Whether to include note titles in logs
+	 * 
+	 * When disabled, logs only contain metadata without identifying which note
+	 * was reviewed. Disabling provides more privacy while still capturing
+	 * review patterns and statistics.
+	 * 
+	 * Default: false (privacy-first approach)
+	 */
 	logNoteTitle: boolean;
+	
+	/**
+	 * Frontmatter properties to include in logs
+	 * 
+	 * Controls which note metadata is logged during reviews:
+	 * - Empty array []: Log no frontmatter (most private)
+	 * - ['*']: Log all frontmatter properties
+	 * - ['prop1', 'prop2']: Log only specified properties
+	 * 
+	 * Use this to balance logging utility with privacy concerns.
+	 * 
+	 * Default: [] (no frontmatter logged)
+	 */
 	logFrontMatterProperties: string[];
+	
+	/**
+	 * Array of contexts for organizing notes into review queues
+	 * 
+	 * Contexts allow users to categorize notes and control which are included
+	 * in reviews. For example, separate contexts for language learning vs
+	 * reference material allows different review schedules and priorities.
+	 * 
+	 * Empty array means all notes share the default spacing method and are
+	 * reviewed together without categorization.
+	 * 
+	 * Default: []
+	 */
 	contexts: Context[];
+	
+	/**
+	 * Array of spacing method configurations
+	 * 
+	 * Each spacing method defines an algorithm (currently only SuperMemo 2.0)
+	 * and its parameters. Methods can be mapped to specific contexts to allow
+	 * different review schedules for different types of notes.
+	 * 
+	 * At least one spacing method must be defined (used as default).
+	 * 
+	 * Default: [{ name: 'Default', spacingAlgorithm: 'SuperMemo2.0', ... }]
+	 */
 	spacingMethods: SpacingMethod[];
+	
+	/**
+	 * Template for captured thought note titles
+	 * 
+	 * Supports template variables:
+	 * - {{date}}: Current date (YYYY-MM-DD format)
+	 * - {{time}}: Current time (HH:MM:SS format)
+	 * - {{unixtime}}: Unix timestamp (milliseconds since epoch)
+	 * - {{thought}}: The captured thought text
+	 * 
+	 * Example: "Thought - {{date}} {{time}}"
+	 * 
+	 * Default: "{{unixtime}}"
+	 */
 	capturedThoughtTitleTemplate: string;
+	
+	/**
+	 * Directory for captured thought notes
+	 * 
+	 * Vault-relative path where new thought notes are created.
+	 * Leave empty to use vault root.
+	 * 
+	 * Example: "Daily Notes/Thoughts"
+	 * 
+	 * Default: ''
+	 */
 	capturedThoughtDirectory: string;
+	
+	/**
+	 * Template for captured thought note content
+	 * 
+	 * Initial content inserted into new thought notes. Supports the same
+	 * template variables as capturedThoughtTitleTemplate.
+	 * 
+	 * Use this to include frontmatter, tags, or other structured content
+	 * in captured thoughts.
+	 * 
+	 * Default: '{{thought}}'
+	 */
 	capturedThoughtNoteTemplate: string;
+	
+	/**
+	 * Whether to add short thoughts as aliases in frontmatter
+	 * 
+	 * When enabled, thoughts shorter than shortCapturedThoughtThreshold are
+	 * added as aliases in the note's frontmatter. This makes them discoverable
+	 * via Obsidian's search and quick switcher.
+	 * 
+	 * Default: false
+	 */
 	includeShortThoughtInAlias: boolean;
+	
+	/**
+	 * Character length threshold for including thoughts as aliases
+	 * 
+	 * Thoughts with character count <= this value will be added as aliases
+	 * when includeShortThoughtInAlias is enabled.
+	 * 
+	 * Default: 50
+	 */
 	shortCapturedThoughtThreshold: number;
+	
+	/**
+	 * Whether to open captured thought notes in a new tab
+	 * 
+	 * When enabled, thought notes open in a new tab, preserving the current
+	 * workspace. When disabled, they open in the active tab.
+	 * 
+	 * Default: true
+	 */
 	openCapturedThoughtInNewTab: boolean;
+	
+	/**
+	 * Folders to exclude from bulk onboarding
+	 * 
+	 * List of vault-relative folder paths to skip when using the "Onboard all
+	 * notes" feature. Use this to exclude templates, scripts, or other notes
+	 * that shouldn't have spaced repetition frontmatter added.
+	 * 
+	 * Example: ['Templates', 'Scripts', 'Archive']
+	 * 
+	 * Default: []
+	 */
 	onboardingExcludedFolders: string[];
+	
+	/**
+	 * Timezone format for timestamps in frontmatter
+	 * 
+	 * Controls how timestamps are stored in se-last-reviewed and other timestamp fields:
+	 * - 'UTC': Store in Coordinated Universal Time (portable across timezones)
+	 * - 'Local': Store in system's local timezone (human-readable in local time)
+	 * 
+	 * Note: Changing this only affects new timestamps. Existing timestamps remain
+	 * in their current format. When timestamps lack explicit timezone info, this
+	 * setting is used to interpret them.
+	 * 
+	 * Default: 'UTC'
+	 */
 	timestampTimeZone: string;
 }
 
 export type { SpacedEverythingPluginSettings };
 
+/**
+ * SpacedEverythingSettingTab - Settings UI orchestrator
+ * 
+ * Renders and manages the plugin's settings interface within Obsidian's
+ * settings window. This class extends Obsidian's PluginSettingTab to provide
+ * a native-feeling settings experience.
+ * 
+ * The display() method is called whenever the settings tab is opened and
+ * renders all settings sections dynamically. Settings are auto-saved to
+ * Obsidian's data storage whenever they change.
+ * 
+ * Settings sections:
+ * - Spacing Methods: Algorithm configuration with nested review options
+ * - Contexts: Note categorization with toggle states
+ * - Vault-wide Settings: Global plugin behaviors
+ * - Logging: Privacy-conscious activity tracking
+ * - Capture Thought: Quick note creation templates
+ * - Onboard All Notes: Bulk vault-wide onboarding (beta)
+ */
 export class SpacedEverythingSettingTab extends PluginSettingTab {
 	plugin: SpacedEverythingPlugin;
 
@@ -30,11 +247,28 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/**
+	 * Render the complete settings UI
+	 * 
+	 * This method builds the entire settings interface from scratch each time
+	 * the settings tab is opened. It creates nested UI structures for complex
+	 * settings like spacing methods (which have review options) and contexts.
+	 * 
+	 * The UI uses Obsidian's Setting components for consistent styling and
+	 * behavior. All settings are wired to auto-save on change via onChange
+	 * callbacks that call plugin.saveSettings().
+	 * 
+	 * Note: This is a long method (~650 lines) organized into logical sections.
+	 * Each major section is marked with comments for navigation.
+	 */
 	display(): void {
 		const {containerEl} = this;
 
 		containerEl.empty();
 
+		// ==================== SECTION: Spacing Methods ====================
+		// Allow users to create and configure multiple spacing algorithms
+		// Each method can have its own review options and parameters
 		new Setting(containerEl).setName('Spacing methods').setHeading();
 		const spacingMethodsSettingDiv = containerEl.createDiv();
 		const spacingMethodsDiv = containerEl.createDiv();
@@ -80,7 +314,9 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				})
 			);
 
-		// review contexts
+		// ==================== SECTION: Contexts ====================
+		// Allow users to categorize notes for separate review queues
+		// Contexts can be toggled active/inactive to control review scope
 		new Setting(containerEl).setName('Contexts').setHeading();
 		const contextsSettingDiv = containerEl.createDiv();
 		const addContextDiv = containerEl.createDiv();
@@ -96,8 +332,11 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(addContextDiv)
-			// TODO::make this render in a better location to make it
-			// more clearly distinct from review options expansion::
+			// TODO: Improve button placement for context addition
+			// Context: The + button for adding contexts renders in a way that could be
+			// confused with the + button for adding review options within spacing methods
+			// Priority: Low - UI polish that improves clarity but doesn't affect functionality
+			// Suggested fix: Add visual separator or move button to a clearer location
 			.addButton((button) =>
 				button
 				.setButtonText('+')
@@ -114,7 +353,8 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				})
 			);
 
-		// Vault-wide settings
+		// ==================== SECTION: Vault-wide Settings ====================
+		// Global settings that affect all spacing methods and contexts
 		new Setting(containerEl).setName('Vault-wide settings').setHeading();
 
 		new Setting(containerEl)
@@ -131,7 +371,9 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			}));
 
-		// Logging settings
+		// ==================== SECTION: Logging ====================
+		// Privacy-conscious logging configuration
+		// Users can control what data is logged and where
 		new Setting(containerEl).setName('Logging').setHeading();
 
 		new Setting(containerEl)
@@ -196,7 +438,9 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				});
 			});
 
-		// Capture thoughts settings
+		// ==================== SECTION: Capture Thought ====================
+		// Quick note creation with template variable support
+		// Allows users to capture fleeting thoughts quickly
 		new Setting(containerEl).setName('Capture thought').setHeading();
 
 		new Setting(containerEl)
@@ -280,7 +524,9 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			);
 
 
-		// Onboard all notes
+		// ==================== SECTION: Onboard All Notes (Beta) ====================
+		// Bulk vault-wide onboarding with folder exclusion support
+		// Warning: This is a powerful feature that modifies many files
 		new Setting(containerEl).setName('Onboard all notes (beta)')
 			.setHeading()
 			.setDesc('This provides an optional means of onboarding every note in your vault to the Spaced Everything system. Importantly, the plugin uses frontmatter properties on notes to track relevant metadata to perform the spacing algorithm actions. So it is recommended to use the "Excluded folders" setting below to filter out subsets of notes that you wish to avoid onboarding. Performing this action will not change any existing Spaced Everything frontmatter if you already have some notes oboarded.\n\nThis is still a beta feature. Currently, it asusmes to only apply the settings from the first Spacing Method (defined above) and assumes to not set any context for notes onboarded in this manner.');
@@ -305,8 +551,15 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			);
 	}
 
+	// ==================== Onboarding Helper Methods ====================
 
-	// functions for onboarding all notes
+	/**
+	 * Display confirmation modal before bulk onboarding
+	 * 
+	 * Shows a warning modal requiring user confirmation before executing
+	 * the vault-wide onboarding operation. This prevents accidental
+	 * execution of this potentially disruptive action.
+	 */
 	async showConfirmationModal() {
 		const modal = new ConfirmationModal(this.app, this.plugin);
 		modal.open();
@@ -322,6 +575,19 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		}
 	}
 
+	/**
+	 * Check if a file should be excluded from bulk onboarding
+	 * 
+	 * Determines whether a file is located within any of the excluded folders
+	 * specified in settings. This check traverses up the folder hierarchy to
+	 * handle nested folders correctly.
+	 * 
+	 * For example, if "Templates" is excluded, both "Templates/note.md" and
+	 * "Templates/Subfolder/note.md" will be excluded.
+	 * 
+	 * @param file - File to check for exclusion
+	 * @returns true if file should be excluded, false otherwise
+	 */
 	isFileExcluded(file: TAbstractFile): boolean {
 		const excludedFolders = this.plugin.settings.onboardingExcludedFolders;
 		let parent: TFolder | null = file.parent;
@@ -351,8 +617,23 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		});
 	}
 
+	// ==================== Settings Rendering Methods ====================
+	// These methods dynamically render complex nested UI structures
 
-	// Functions for rendering subsets of the settings
+	/**
+	 * Render a spacing method configuration section
+	 * 
+	 * Creates a collapsible UI section for configuring a single spacing method,
+	 * including algorithm selection, parameters, and nested review options.
+	 * 
+	 * UI includes conditional visibility:
+	 * - Custom script field shown only when algorithm = 'Custom'
+	 * - Default ease factor shown only when algorithm = 'SuperMemo2.0'
+	 * 
+	 * @param containerEl - Parent element to render into
+	 * @param spacingMethod - Spacing method configuration to render
+	 * @param index - Position in spacingMethods array (for display purposes)
+	 */
 	renderSpacingMethodSetting(containerEl: HTMLElement, spacingMethod: SpacingMethod, index: number) {
 		const settingEl = containerEl.createDiv('spacing-method-settings-items');
 		const settingHeader = settingEl.createDiv('spacing-method-header');
@@ -431,7 +712,12 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setPlaceholder('Custom script file name')
 				.setValue(spacingMethod.customScriptFileName)
 				.onChange(async (value) => {
-					// TODO::implement helper stuff for auto-completing paths/filenames::
+					// TODO: Implement file path autocomplete for custom script selection
+					// Context: Users need to manually type the full path to their custom
+					// algorithm script file, which is error-prone
+					// Priority: Medium - Would improve UX once custom scripts are supported
+					// Blocked by: Custom script functionality (not yet implemented)
+					// Suggested fix: Add file suggester modal similar to Obsidian's file picker
 					spacingMethod.customScriptFileName = value;
 					await this.plugin.saveSettings();
 				})
@@ -489,8 +775,11 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 
 		// Add delete button for the spacing method
 		new Setting(settingEl)
-			// TODO::make this render in a better location to make it
-			// more clearly distinct from review options expansion::
+			// TODO: Improve delete button placement for spacing methods
+			// Context: The delete button renders in a location that could be confused
+			// with review option delete buttons within the same spacing method
+			// Priority: Low - UI polish that improves clarity but doesn't affect functionality
+			// Suggested fix: Move to spacing method header or add clear visual separation
 			.addExtraButton((cb) => {
 				cb.setIcon('cross')
 					.setTooltip('Delete spacing method')

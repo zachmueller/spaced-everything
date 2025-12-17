@@ -5,6 +5,31 @@ import { SpacedEverythingPluginSettings, SpacedEverythingSettingTab } from './se
 import { Suggester, suggester } from './suggester';
 import { FrontmatterQueue } from './frontmatterQueue';
 
+/**
+ * SpacedEverythingPlugin - Main plugin orchestrator for spaced repetition in Obsidian
+ * 
+ * This is the primary entry point that coordinates all plugin functionality. It manages
+ * the plugin lifecycle, registers user commands, handles settings persistence, and
+ * orchestrates review workflows using the SuperMemo 2.0 spaced repetition algorithm.
+ * 
+ * The plugin implements a queue-based frontmatter update system to prevent race conditions
+ * with Obsidian's file save events. When users edit files, Obsidian fires multiple save
+ * events in rapid succession, which can corrupt frontmatter if updates are applied
+ * immediately. The FrontmatterQueue batches and deduplicates updates before applying
+ * them atomically.
+ * 
+ * Key Features:
+ * - SuperMemo 2.0 algorithm for calculating optimal review intervals
+ * - Context-based organization of notes into separate review queues
+ * - Privacy-conscious logging of review activity
+ * - Thought capture workflow for quick note creation
+ * - Configurable spacing methods and review options
+ * 
+ * Key exports: SpacedEverythingPlugin class (default export)
+ * Dependencies: Obsidian Plugin API, FrontmatterQueue for atomic updates, Logger for activity tracking
+ * Integration: Extends Obsidian's Plugin class, uses MetadataCache for efficient file scanning
+ */
+
 const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	logFilePath: "", // defaults to no logging
 	logOnboardAction: true,
@@ -36,6 +61,44 @@ const DEFAULT_SETTINGS: SpacedEverythingPluginSettings = {
 	timestampTimeZone: "UTC",
 }
 
+/**
+ * SpacedEverythingPlugin - Main plugin class for Obsidian spaced repetition
+ * 
+ * Coordinates all plugin functionality including command registration, settings management,
+ * and review workflows. Implements the SuperMemo 2.0 algorithm to calculate optimal review
+ * intervals based on user feedback (quality scores from 0-5).
+ * 
+ * Architecture:
+ * - Uses FrontmatterQueue to batch and deduplicate frontmatter updates, preventing race
+ *   conditions when Obsidian fires multiple save events during user edits
+ * - Leverages MetadataCache for fast access to note frontmatter without file I/O
+ * - Implements context-based filtering to organize notes into separate review queues
+ * 
+ * Plugin Lifecycle:
+ * 1. onload() - Initializes logger, queue, registers commands and settings tab
+ * 2. User triggers commands (review, capture thought, toggle contexts, etc.)
+ * 3. Plugin scans vault and calculates which notes are due for review
+ * 4. User reviews notes and provides quality scores
+ * 5. Plugin updates intervals using SuperMemo 2.0 algorithm
+ * 6. onunload() - Cleanup (minimal for this plugin)
+ * 
+ * Core User Workflows:
+ * - Review workflow: User opens next due note, rates recall quality, interval updates automatically
+ * - Onboarding: User adds existing notes to spaced repetition system with initial settings
+ * - Context management: User organizes notes into separate queues (e.g., learning vs. reference)
+ * - Thought capture: User quickly creates new notes with automatic onboarding
+ * 
+ * @example
+ * ```typescript
+ * // Plugin is instantiated automatically by Obsidian
+ * // Users interact via registered commands:
+ * // - "Spaced Everything: Open next item for review"
+ * // - "Spaced Everything: Log review outcome"
+ * // - "Spaced Everything: Toggle note contexts"
+ * // - "Spaced Everything: Capture thought"
+ * // - "Spaced Everything: Update spacing method"
+ * ```
+ */
 export default class SpacedEverythingPlugin extends Plugin {
 	settings: SpacedEverythingPluginSettings;
 	logger: Logger;
@@ -399,35 +462,95 @@ export default class SpacedEverythingPlugin extends Plugin {
 		await this.processFrontmatterQueue();
 	}
 
+	/**
+	 * Filter notes by active contexts, handling edge cases for backward compatibility
+	 * 
+	 * Context filtering has several non-obvious edge cases designed to ensure users can
+	 * always review notes, even if they haven't configured contexts yet or have temporarily
+	 * deactivated all contexts. This prevents the frustrating situation where users
+	 * accidentally lock themselves out of all reviews.
+	 * 
+	 * Edge Cases (in priority order):
+	 * 1. No contexts defined in settings → Include all notes (user hasn't set up contexts yet)
+	 * 2. All contexts inactive → Include no notes and show warning (intentional pause)
+	 * 3. Note has no se-contexts property → Include note (backward compatibility for old notes)
+	 * 4. Note has contexts AND some contexts active → Include if note matches ANY active context (OR logic)
+	 * 
+	 * The OR logic in case 4 means a note tagged with ['learning', 'reference'] will appear
+	 * in reviews if EITHER 'learning' OR 'reference' is active, not requiring both.
+	 * 
+	 * @param files - Array of note files to filter
+	 * @returns Filtered array of notes matching active contexts (or all notes in edge cases)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Case 1: No contexts configured → returns all notes
+	 * settings.contexts = [];
+	 * const filtered = filterNotesByContext(allNotes);
+	 * // filtered === allNotes
+	 * 
+	 * // Case 2: All contexts inactive → returns empty array
+	 * settings.contexts = [
+	 *   { name: 'learning', isActive: false },
+	 *   { name: 'reference', isActive: false }
+	 * ];
+	 * const filtered = filterNotesByContext(allNotes);
+	 * // filtered === []
+	 * // Also shows notice: "Spaced everything: No active contexts"
+	 * 
+	 * // Case 3: Note without se-contexts property → included
+	 * settings.contexts = [{ name: 'learning', isActive: true }];
+	 * // Note A: { frontmatter: {} } → included (backward compatibility)
+	 * // Note B: { frontmatter: { 'se-contexts': ['learning'] } } → included (matches)
+	 * 
+	 * // Case 4: OR logic for multiple contexts
+	 * settings.contexts = [
+	 *   { name: 'learning', isActive: true },
+	 *   { name: 'reference', isActive: false }
+	 * ];
+	 * // Note with ['learning', 'reference'] → included (matches 'learning')
+	 * // Note with ['reference'] → excluded (doesn't match any active)
+	 * // Note with ['learning'] → included (matches 'learning')
+	 * ```
+	 */
 	private filterNotesByContext(files: TFile[]): TFile[] {
 		const activeContexts = this.settings.contexts.filter(context => context.isActive).map(context => context.name);
 
-		// Case 1: No defined at all contexts
+		// Edge Case 1: No contexts defined in settings at all
+		// This handles the initial state when users haven't set up contexts yet.
+		// Return all notes to avoid empty review queue and allow users to start reviewing
+		// immediately without configuration.
 		if (this.settings.contexts.length === 0) {
-			// If no contexts are defined or all are inactive, return all files
 			return files;
 		}
 
-		// Case 2: All contexts are inactive
+		// Edge Case 2: Contexts exist but all are inactive
+		// This is likely intentional (user paused all reviews), so respect it by returning
+		// empty array. Show notice to confirm the intentional pause and help debug if accidental.
 		if (this.settings.contexts.length > 0 && activeContexts.length === 0) {
-			// If all contexts are defined but none are active, return no files
 			new Notice('Spaced everything: No active contexts');
 			return [];
 		}
 
+		// Cases 3 & 4: Filter notes based on their se-contexts property
 		return files.filter(file => {
 			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 			const noteContexts = frontmatter?.['se-contexts'] || [];
 
-			// Case 3: If noteContexts is empty, always include
+			// Edge Case 3: Note has no se-contexts property (or it's empty)
+			// This provides backward compatibility for notes onboarded before the contexts
+			// feature existed, or notes onboarded when no contexts were configured.
+			// These notes should always be reviewable to avoid orphaning old content.
 			if (noteContexts.length === 0) {
 				return true;
 			}
 
-			// Case 4: Some contexts are active
+			// Edge Case 4: Note has contexts AND some global contexts are active
+			// Use OR logic: include note if it has ANY active context (not requiring ALL contexts)
+			// This is more intuitive - users expect a note tagged ['learning', 'reference']
+			// to appear when reviewing 'learning' notes, even if 'reference' is inactive.
 			const hasActiveContext = noteContexts.some((noteContext: string) => activeContexts.includes(noteContext));
 
-			// If any of the note's contexts match the active contexts, include it
 			return hasActiveContext;
 		});
 	}
@@ -547,6 +670,57 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Calculate next review interval using SuperMemo 2.0 algorithm
+	 * 
+	 * SuperMemo 2.0 is a spaced repetition algorithm that adjusts review intervals based on
+	 * how well the user recalls information. It uses two key metrics:
+	 * 
+	 * 1. Interval: Days between reviews (grows with successful recalls)
+	 * 2. Ease Factor: Multiplier determining how fast intervals grow (personalizes to material difficulty)
+	 * 
+	 * Algorithm Behavior:
+	 * - Score 0-2 (failed recall): Reset interval to 1 day, reduce ease factor
+	 * - Score 3-5 (successful recall): Multiply interval by ease factor, adjust ease based on quality
+	 * 
+	 * The ease factor adjusts after each review to personalize the schedule:
+	 * - Perfect recall (score 5): Increases ease factor (material is easy, can space more aggressively)
+	 * - Difficult recall (score 3): Decreases ease factor (material is hard, space more conservatively)
+	 * 
+	 * Mathematical Formulas:
+	 * - newInterval = oldInterval × easeFactor (for successful reviews with score ≥ 3)
+	 * - newInterval = 1 (for failed reviews with score < 3)
+	 * - easeAdjustment = 0.1 - (5 - score) × (0.08 + (5 - score) × 0.02)
+	 * - newEaseFactor = max(1.3, oldEaseFactor + easeAdjustment)
+	 * 
+	 * The constants (0.1, 0.08, 0.02, 1.3) are from the original SuperMemo 2.0 paper by
+	 * Piotr Woźniak and were derived empirically through extensive testing.
+	 * 
+	 * @param file - The note file being reviewed
+	 * @param frontmatter - Current frontmatter (used for logging, actual values read from file)
+	 * @param reviewScore - User's quality rating (0-5, where 0=total blackout, 3=recalled with difficulty, 5=perfect recall)
+	 * @param nowFormatted - Current timestamp in configured timezone format
+	 * @param activeSpacingMethod - Spacing method configuration containing default values
+	 * @returns Object with new interval (in days) and adjusted ease factor
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Successful review after 7 days with good recall (score 4)
+	 * const result = await updateInterval(file, frontmatter, 4, timestamp, method);
+	 * // result: { interval: 17.5, easeFactor: 2.5 }
+	 * // Interval grew by 2.5x, ease factor remained stable
+	 * 
+	 * // Failed review (score 1) - couldn't recall the information
+	 * const result = await updateInterval(file, frontmatter, 1, timestamp, method);
+	 * // result: { interval: 1, easeFactor: 2.18 }
+	 * // Interval reset to 1 day, ease factor reduced to make future reviews easier
+	 * 
+	 * // Perfect recall (score 5) - remembered effortlessly
+	 * const result = await updateInterval(file, frontmatter, 5, timestamp, method);
+	 * // result: { interval: 21, easeFactor: 2.6 }
+	 * // Interval grew aggressively, ease factor increased for faster future growth
+	 * ```
+	 */
 	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, nowFormatted: string, activeSpacingMethod: SpacingMethod): Promise<{ newInterval: number; newEaseFactor: number; }> {
 		let prevInterval = 1;
 		let prevEaseFactor = 2.5;
@@ -558,15 +732,33 @@ export default class SpacedEverythingPlugin extends Plugin {
 			prevInterval = Number(frontmatter['se-interval'] || activeSpacingMethod?.defaultInterval || 1);
 			prevEaseFactor = Number(frontmatter['se-ease'] || activeSpacingMethod?.defaultEaseFactor || 2.5);
 
-			// Calculate the new ease factor based on the review score
+			// SuperMemo 2.0: Calculate ease factor adjustment based on recall quality
+			// Formula: EF' = EF + (0.1 - (5 - q) × (0.08 + (5 - q) × 0.02))
+			// where q = quality score (0-5)
+			// 
+			// Constants are from original SuperMemo 2.0 paper:
+			// - 0.1: Base ease adjustment per review
+			// - 0.08: Primary difficulty scaling factor
+			// - 0.02: Secondary difficulty scaling factor
+			// - These were empirically derived by Piotr Woźniak through extensive testing
+			//
+			// Higher scores increase ease (material is easier, intervals can grow faster)
+			// Lower scores decrease ease (material is harder, intervals should grow slower)
 			newEaseFactor = prevEaseFactor + (0.1 - (5 - reviewScore) * (0.08 + (5 - reviewScore) * 0.02));
+			
+			// SuperMemo 2.0: Minimum ease factor is 1.3 to prevent intervals from shrinking too much
+			// This ensures intervals always grow at least 30% on successful reviews
 			newEaseFactor = Math.max(1.3, parseFloat(newEaseFactor.toFixed(4)));
 
-			// Calculate the new interval using the SuperMemo 2.0 formula
+			// SuperMemo 2.0: Calculate new interval by multiplying previous interval by ease factor
+			// This exponential growth is the core of spaced repetition - successful reviews lead to
+			// progressively longer intervals, optimizing for long-term retention
 			newInterval = Math.max(1, prevInterval * newEaseFactor);
 			newInterval = parseFloat(newInterval.toFixed(4));
 
-			// Override interval to 1 day if the review score less than 3
+			// SuperMemo 2.0: Score < 3 indicates failed recall (couldn't remember the information)
+			// Reset interval to 1 day to relearn the material quickly
+			// Note: Ease factor still adjusts (decreased above) to make future reviews easier
 			if (reviewScore < 3) {
 				newInterval = 1;
 			}

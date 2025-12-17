@@ -668,12 +668,12 @@ Simple helpers, well-understood code, optional enhancements
 - [x] **frontmatterQueue.ts: add() method** - `frontmatterQueue.ts` - M - Document queue behavior and undefined=delete
 - [x] **frontmatterQueue.ts: process() method** - `frontmatterQueue.ts` - M - Document atomic processing guarantee
 - [x] **frontmatterQueue.ts: Inline comments** - `frontmatterQueue.ts` - S - Explain Object.assign merge logic
-- [ ] **main.ts: File header** - `main.ts` - M - Document main orchestrator role
-- [ ] **main.ts: Class documentation** - `main.ts` - M - Document plugin lifecycle and coordination
-- [ ] **main.ts: updateInterval() method** - `main.ts` - L - Full SuperMemo 2.0 algorithm documentation with formula
-- [ ] **main.ts: SuperMemo constants** - `main.ts` - S - Explain 0.1, 0.08, 0.02, 1.3 constants
-- [ ] **main.ts: filterNotesByContext()** - `main.ts` - M - Document 4 edge cases clearly
-- [ ] **main.ts: Context edge case comments** - `main.ts` - M - Inline comments for each filtering case
+- [x] **main.ts: File header** - `main.ts` - M - Document main orchestrator role
+- [x] **main.ts: Class documentation** - `main.ts` - M - Document plugin lifecycle and coordination
+- [x] **main.ts: updateInterval() method** - `main.ts` - L - Full SuperMemo 2.0 algorithm documentation with formula
+- [x] **main.ts: SuperMemo constants** - `main.ts` - S - Explain 0.1, 0.08, 0.02, 1.3 constants
+- [x] **main.ts: filterNotesByContext()** - `main.ts` - M - Document 4 edge cases clearly
+- [x] **main.ts: Context edge case comments** - `main.ts` - M - Inline comments for each filtering case
 - [x] **types.ts: File header** - `types.ts` - S - Explain centralized type definitions
 
 **Total P0 Effort:** 5.5 hours

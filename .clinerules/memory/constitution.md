@@ -1,8 +1,8 @@
 # Project Constitution
 
 **Version:** 1.0.0  
-**Ratified:** 2024-12-17  
-**Last Amended:** 2024-12-17  
+**Ratified:** 2025-12-17  
+**Last Amended:** 2025-12-17  
 
 ## Project Identity
 

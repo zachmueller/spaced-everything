@@ -39,12 +39,31 @@ An optional cap on how long intervals can grow, preventing notes from being forg
 ### Onboarding
 The process of adding a note to the spaced repetition system by initializing its frontmatter properties (`se-interval`, `se-last-reviewed`, `se-ease`). Onboarding can be done individually per note or in bulk for the entire vault.
 
+### Due Date
+The calculated date when a note becomes eligible for review, determined by adding the interval to the last reviewed date (`se-last-reviewed + se-interval`). Notes with due dates in the past appear in the review queue, sorted with oldest due dates first. Notes with future due dates are excluded from reviews until that date arrives.
+
+The due date is not stored as a frontmatter property—it's computed on-demand whenever the review queue is accessed. This ensures the queue always reflects the current state without requiring additional file updates.
+
 ### Context
 A category or tag for organizing notes into separate review queues. Examples include "Work", "Personal", "Learning", or "Reference". Contexts allow focused review sessions and can have different spacing methods.
 
 - **Active Context**: A context that's currently enabled for reviews. Only notes with active contexts are included in the review queue.
 - **Inactive Context**: A context that's temporarily disabled. Notes with only inactive contexts are excluded from reviews.
 - **Context Filtering**: The process of determining which notes to include in reviews based on active contexts.
+
+**Usage Examples:**
+
+A typical workflow might organize notes by life domain:
+- **Work**: Project documentation, meeting notes, work-related research
+- **Personal**: Journal entries, personal goals, hobby notes
+- **Learning**: Study notes, courses, technical research
+
+With contexts configured, you can focus reviews based on your current situation:
+- During work hours, activate only the "Work" context to review professional notes
+- In the evening, switch to the "Personal" context for personal development
+- On weekends, activate "Learning" to engage with study material
+
+Notes can belong to multiple contexts. For example, a note about "presentation skills" might have both "Work" and "Personal" contexts, appearing in either review queue depending on which contexts are active.
 
 ### Spacing Method
 A configuration defining the algorithm and parameters used to calculate review intervals. Each method includes:

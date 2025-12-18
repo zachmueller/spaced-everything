@@ -441,6 +441,26 @@ export default class SpacedEverythingPlugin extends Plugin {
 		modal.open();
 	}
 
+	/**
+	 * Process captured thought content with template variable replacement
+	 * 
+	 * Prepares the user's raw thought input for insertion into a new note by
+	 * trimming whitespace and replacing template variables with current values.
+	 * 
+	 * This is a convenience wrapper around replaceCapturedThoughtVariables that
+	 * ensures consistent preprocessing of all captured thoughts.
+	 * 
+	 * @param thought - Raw thought text entered by user
+	 * @param now - Current timestamp for variable replacement
+	 * @returns Processed thought with variables replaced and whitespace trimmed
+	 * 
+	 * @example
+	 * ```typescript
+	 * const thought = "  Captured at {{time}}  ";
+	 * const processed = processCapturedThoughtNewNoteContents(thought, new Date());
+	 * // Returns: "Captured at 14:30:45" (trimmed, variables replaced)
+	 * ```
+	 */
 	private processCapturedThoughtNewNoteContents(thought: string, now: Date): string {
 		thought = thought.trim();
 		thought = this.replaceCapturedThoughtVariables(thought, now);
@@ -448,6 +468,36 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return thought;
 	}
 
+	/**
+	 * Replace template variables in content with current timestamp values
+	 * 
+	 * Supports three template variables for customizing thought capture:
+	 * - {{unixtime}}: Unix timestamp in seconds (e.g., "1702841400")
+	 * - {{date}}: ISO 8601 date (e.g., "2025-12-18")
+	 * - {{time}}: Localized time (e.g., "14:30")
+	 * 
+	 * Variables are replaced globally (all occurrences), allowing users to
+	 * include timestamps multiple times in titles or content if desired.
+	 * 
+	 * Used by both note title generation and content template processing to
+	 * ensure consistent variable replacement across the capture workflow.
+	 * 
+	 * @param content - String containing template variables to replace
+	 * @param now - Current timestamp for variable values
+	 * @returns Content with all template variables replaced with actual values
+	 * 
+	 * @example
+	 * ```typescript
+	 * const template = "Captured on {{date}} at {{time}} ({{unixtime}})";
+	 * const result = replaceCapturedThoughtVariables(template, new Date('2025-12-18T14:30:45Z'));
+	 * // Returns: "Captured on 2025-12-18 at 14:30 (1702841445)"
+	 * 
+	 * // Multiple occurrences
+	 * const template = "{{date}}/{{time}}-{{unixtime}}.md";
+	 * const result = replaceCapturedThoughtVariables(template, now);
+	 * // Returns: "2025-12-18/14:30-1702841445.md"
+	 * ```
+	 */
 	private replaceCapturedThoughtVariables(content: string, now: Date): string {
 		const unixTime = Math.floor(now.getTime() / 1000).toString();
 		const dateString = now.toISOString().split("T")[0];
@@ -459,6 +509,42 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return content;
 	}
 
+	/**
+	 * Generate a unique file path by appending counter if path exists
+	 * 
+	 * Ensures file creation won't fail due to path conflicts by checking if
+	 * the desired path already exists and appending an incrementing counter
+	 * until a unique path is found.
+	 * 
+	 * This is critical for thought capture where users might create multiple
+	 * thoughts with the same title template (e.g., "Inbox {{date}}" creates
+	 * collisions if user captures multiple thoughts on the same day).
+	 * 
+	 * Collision resolution:
+	 * 1. Try original filename (e.g., "Note.md")
+	 * 2. If exists, try "Note-1.md"
+	 * 3. If exists, try "Note-2.md"
+	 * 4. Continue incrementing until unique path found
+	 * 
+	 * @param filename - Desired filename without extension
+	 * @param extension - File extension to append (default: '.md')
+	 * @returns Promise resolving to unique file path (vault-relative)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // First capture today
+	 * const path = await generateUniqueFilePath("Inbox 2025-12-18");
+	 * // Returns: "Inbox 2025-12-18.md" (path is free)
+	 * 
+	 * // Second capture today (path exists)
+	 * const path = await generateUniqueFilePath("Inbox 2025-12-18");
+	 * // Returns: "Inbox 2025-12-18-1.md" (added counter)
+	 * 
+	 * // With custom extension
+	 * const path = await generateUniqueFilePath("data", ".json");
+	 * // Returns: "data.json" or "data-1.json" if exists
+	 * ```
+	 */
 	private async generateUniqueFilePath(filename: string, extension: string = '.md'): Promise<string> {
 		let uniqueFilename = `${filename}${extension}`;
 
@@ -482,6 +568,45 @@ export default class SpacedEverythingPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Create a new note file from captured thought with template processing
+	 * 
+	 * Generates a new markdown file for the captured thought, processing both
+	 * the title template and content template with variable replacement. The
+	 * file is created in the configured directory with automatic uniqueness
+	 * handling to prevent path collisions.
+	 * 
+	 * Template processing:
+	 * 1. Generate title from capturedThoughtTitleTemplate (supports {{variables}})
+	 * 2. Ensure unique file path (appends counter if needed)
+	 * 3. Generate content from capturedThoughtNoteTemplate
+	 * 4. Insert thought into content at {{thought}} placeholder
+	 * 5. Create file with processed content
+	 * 
+	 * Special handling for missing {{thought}} variable:
+	 * If the content template doesn't include {{thought}}, the thought is
+	 * automatically appended after the template with a warning message. This
+	 * prevents data loss and alerts the user to fix their template.
+	 * 
+	 * @param thought - Captured thought text (already processed with variables replaced)
+	 * @param now - Current timestamp for title/content variable replacement
+	 * @returns Promise resolving to created TFile object
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Standard template with {{thought}} placeholder
+	 * // Template: "## Captured Thought\n{{thought}}"
+	 * const file = await createNewNoteFile("My idea", new Date());
+	 * // Creates file with content: "## Captured Thought\nMy idea"
+	 * 
+	 * // Template without {{thought}} placeholder
+	 * // Template: "## Daily Note\n\n"
+	 * const file = await createNewNoteFile("My idea", new Date());
+	 * // Creates file with content:
+	 * // "## Daily Note\n\n---\n\n## Thought\nMy idea\n\n
+	 * // Note: Your template doesn't contain {{thought}}..."
+	 * ```
+	 */
 	async createNewNoteFile(thought: string, now: Date): Promise<TFile> {
 		const noteTitle = this.replaceCapturedThoughtVariables(this.settings.capturedThoughtTitleTemplate, now);
 		const noteDirectory = this.settings.capturedThoughtDirectory || "";
@@ -504,6 +629,37 @@ export default class SpacedEverythingPlugin extends Plugin {
 		return newNoteFile;
 	}
 
+	/**
+	 * Open newly created note in active or new tab based on settings
+	 * 
+	 * Opens the note file in either the current tab (replacing active content)
+	 * or a new tab (preserving workspace), depending on the user's
+	 * openCapturedThoughtInNewTab setting.
+	 * 
+	 * Respects user's workspace preferences:
+	 * - New tab: Preserves current work, useful for quick thought capture without disruption
+	 * - Active tab: Immediately focuses on new thought, useful for elaboration workflows
+	 * 
+	 * Fallback handling: If no active leaf exists (rare edge case), always opens
+	 * in a new tab and shows a notice to inform the user.
+	 * 
+	 * @param newNoteFile - File to open (created by createNewNoteFile)
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Setting: openCapturedThoughtInNewTab = true
+	 * await openNewNote(file);
+	 * // Opens in new tab, preserves current tab
+	 * 
+	 * // Setting: openCapturedThoughtInNewTab = false
+	 * await openNewNote(file);
+	 * // Opens in active tab, replaces current content
+	 * 
+	 * // Edge case: No active leaf
+	 * await openNewNote(file);
+	 * // Opens in new tab, shows notice: "No active editor, opened note in new tab"
+	 * ```
+	 */
 	async openNewNote(newNoteFile: TFile) {
 		const { openCapturedThoughtInNewTab } = this.settings;
 

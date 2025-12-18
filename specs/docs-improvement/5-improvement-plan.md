@@ -708,13 +708,13 @@ Simple helpers, well-understood code, optional enhancements
 
 ### Medium Priority Tasks (P2) - Do Eventually
 
-- [ ] **suggester.ts: File header** - `suggester.ts` - S - Explain reusable modal component
-- [ ] **suggester.ts: Class documentation** - `suggester.ts` - M - Document modal class
-- [ ] **suggester.ts: suggester() function** - `suggester.ts` - M - Document promise wrapper
-- [ ] **logger.ts: generateLogData()** - `logger.ts` - M - Document configurable log format
-- [ ] **settings.ts: display() overview** - `settings.ts` - M - Add method overview comment
-- [ ] **settings.ts: isFileExcluded()** - `settings.ts` - M - Document folder traversal logic
-- [ ] **main.ts: Template processing** - `main.ts` - M - Document variable replacement
+- [x] **suggester.ts: File header** - `suggester.ts` - S - Explain reusable modal component
+- [x] **suggester.ts: Class documentation** - `suggester.ts` - M - Document modal class
+- [x] **suggester.ts: suggester() function** - `suggester.ts` - M - Document promise wrapper
+- [x] **logger.ts: generateLogData()** - `logger.ts` - M - Document configurable log format
+- [x] **settings.ts: display() overview** - `settings.ts` - M - Add method overview comment
+- [x] **settings.ts: isFileExcluded()** - `settings.ts` - M - Document folder traversal logic
+- [x] **main.ts: Template processing** - `main.ts` - M - Document variable replacement
 - [ ] **README.md: Configuration** - `README.md` - M - Explain all settings in detail
 - [ ] **README.md: Frontmatter properties** - `README.md` - S - Document se-* properties
 - [ ] **README.md: SuperMemo explanation** - `README.md` - M - User-friendly algorithm explanation

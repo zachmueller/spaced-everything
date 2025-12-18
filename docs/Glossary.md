@@ -16,20 +16,22 @@ A spaced repetition algorithm developed by Piotr Woźniak in 1987. It adjusts re
 ## Algorithm Terms
 
 ### Interval
-The number of days between reviews of a note. Intervals grow with successful reviews and reset to minimum on failed reviews. Stored in the `se-interval` frontmatter property.
+The number of days between reviews of a note. In regular spaced repetition applied to memorization, intervals grow with successful reviews and reset to minimum on failed reviews. In the context of SWP, intervals grow when developing ideas in a note are unfruitful while they reset when progress is fruitful, ensuring the note resurfaces again quickly. Stored in the `se-interval` frontmatter property.
 
 ### Ease Factor
-A multiplier (typically 1.3 to 3.0) that determines how quickly intervals grow. Higher ease factors indicate material that's easier to engage with, while lower factors indicate harder material. The algorithm adjusts ease based on review quality. Stored in the `se-ease` frontmatter property.
+A multiplier (typically 1.3 to 3.0) that determines how quickly intervals grow. In regular spaced repetition applied to memorization, higher ease factors indicate material that's easier to engage with, while lower factors indicate harder material. In the context of SWP, higher ease factor means reiewing the note is less fruitful, while smaller ease factors indicate each revisit of the note sparks new thinking. The algorithm adjusts ease based on review quality. Stored in the `se-ease` frontmatter property.
 
 ### Review Quality Score
-A numeric rating (0-5 in SuperMemo 2.0) that indicates how productive a review session was:
+A numeric rating (0-5 in SuperMemo 2.0) that indicates how productive a memorization review session was:
 - **0-2**: Failed/unproductive → interval resets
 - **3-5**: Successful/productive → interval grows
 
-In Spaced Everything, this maps to review options like "Fruitful" (high score) or "Unfruitful" (low score).
+In SWP, this maps to review options like:
+- "Fruitful" (low score): writing was productive when revisiting the note
+- "Unfruitful" (high score): revisiting the note did not spark new thoughts
 
 ### Minimum Interval
-The shortest possible interval between reviews, typically 1 day. Notes return to this interval after failed reviews (score < 3). Configurable in spacing method settings as "Default interval".
+The shortest possible interval between reviews, typically 1 day. Notes return to this interval after low score reviews (score < 3). Configurable in spacing method settings as "Default interval".
 
 ### Maximum Interval
 An optional cap on how long intervals can grow, preventing notes from being forgotten due to excessively long gaps. While SuperMemo 2.0 allows unlimited growth, many implementations cap intervals at 365 days (1 year).
@@ -66,8 +68,9 @@ With contexts configured, you can focus reviews based on your current situation:
 Notes can belong to multiple contexts. For example, a note about "presentation skills" might have both "Work" and "Personal" contexts, appearing in either review queue depending on which contexts are active.
 
 ### Spacing Method
-A configuration defining the algorithm and parameters used to calculate review intervals. Each method includes:
-- Algorithm name (currently only SuperMemo 2.0)
+A configuration defining the algorithm and parameters used to calculate review intervals. Each method includes settings for:
+- Algorithm (currently only SuperMemo 2.0)
+- Name
 - Default interval for new notes
 - Default ease factor
 - Review options with scores
@@ -77,8 +80,8 @@ Multiple spacing methods can be defined and mapped to different contexts.
 
 ### Review Options
 Customizable choices presented to users during review, each mapped to a numeric score. Default options are:
-- **Fruitful**: Good progress made (high score, typically 4-5)
-- **Unfruitful**: Limited progress (low score, typically 0-2)  
+- **Fruitful**: Good progress made (low score, typically 0-2)
+- **Unfruitful**: Limited progress (high score, typically 4-5)  
 - **Ignore**: Moderate progress (mid score, typically 3)
 
 ### Review Queue
@@ -98,7 +101,7 @@ Frontmatter property storing the ISO 8601 timestamp of the last review. Used wit
 ### se-ease
 Frontmatter property storing the ease factor (typically 1.3 to 3.0). Adjusted after each review to personalize the spacing for each note.
 
-### se-context
+### se-contexts
 Optional frontmatter property storing the context(s) a note belongs to. Can be a single string or array of strings for multiple contexts.
 
 ### se-spacing-method
@@ -138,9 +141,6 @@ YAML metadata at the top of markdown files enclosed in `---` delimiters. Obsidia
 
 ### MetadataCache
 Obsidian's internal cache of parsed file metadata (frontmatter, links, headings). Provides fast access to note properties without reading files from disk.
-
-### Race Condition
-A software bug where the outcome depends on the sequence or timing of events. Spaced Everything uses a queue-based approach to prevent race conditions when updating frontmatter during rapid file changes.
 
 ## Algorithm Constants
 
@@ -183,7 +183,7 @@ A note-taking methodology emphasizing:
 Spaced Everything implements the periodic review aspect using spaced repetition.
 
 ### Writing Inbox
-A concept from Andy Matuschak's methodology where fleeting thoughts are captured quickly and later processed into more developed notes. The "Capture thought" feature implements this pattern.
+A concept from Andy Matuschak's methodology where fleeting thoughts are captured quickly and later processed into more developed notes. The "Capture thought" feature attempts to implement this pattern.
 
 ### Piotr Woźniak
 Creator of SuperMemo and pioneer of spaced repetition research. His work on memory optimization led to the development of the SuperMemo algorithms, including SM-2 (SuperMemo 2.0).
@@ -191,7 +191,7 @@ Creator of SuperMemo and pioneer of spaced repetition research. His work on memo
 ## Edge Cases and Special Behaviors
 
 ### Notes Without Contexts
-Notes without a `se-context` property are included in reviews for backward compatibility with vaults that predate the contexts feature. This ensures users don't lose access to onboarded notes after upgrading.
+Notes without a `se-contexts` property are included in reviews for backward compatibility with vaults that predate the contexts feature. This ensures users don't lose access to onboarded notes after upgrading.
 
 ### All Contexts Inactive
 When all contexts are toggled inactive, the plugin includes all notes in reviews. This prevents accidentally emptying the review queue and ensures users can always review notes.
@@ -201,9 +201,6 @@ The SuperMemo 2.0 algorithm enforces a minimum ease factor of 1.3. This prevents
 
 ### Timestamp Ambiguity
 When timestamps lack explicit timezone information (e.g., manually edited via Obsidian's properties panel), the plugin uses the configured `timestampTimeZone` setting to interpret them.
-
-### Queue Deduplication
-When multiple frontmatter updates are queued for the same file, later updates override earlier ones. This prevents conflicts and ensures only the final state is written to disk.
 
 ## Acronyms
 

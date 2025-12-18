@@ -57,11 +57,11 @@ Borrowing from Andy Matuschak's [notes](https://notes.andymatuschak.org/About_th
 Day 1: Onboard "Project Ideas" note → Rate as "Fruitful"
        ↓ (1 day later)
 Day 2: Review "Project Ideas" → Made progress → Rate as "Fruitful"  
+       ↓ (1 day later)
+Day 3: Review "Project Ideas" → Struggling to add more → Rate as "Ignore"
        ↓ (2-3 days later)
-Day 5: Review "Project Ideas" → Expanded ideas → Rate as "Fruitful"
-       ↓ (5-7 days later)
-Day 12: Review "Project Ideas" → Struggling to add more → Rate as "Unfruitful"
-        ↓ (reset to shorter interval)
+Day 6: Review "Project Ideas" → No progress → Rate as "Unfruitful"
+        ↓ (5-7 days later)
 Day 13: Review "Project Ideas" → Fresh perspective → Rate as "Fruitful"
 ```
 
@@ -133,15 +133,15 @@ Configure the algorithms and parameters that control review intervals.
 - Future releases will support custom algorithms
 
 **Default ease factor**: Controls how quickly intervals grow (default: 2.5)
-- Higher values = faster growth (use for easier material)
-- Lower values = slower growth (use for harder material)
+- Higher values = faster growth
+- Lower values = slower growth
 - Minimum: 1.3 (algorithm constraint)
 
 **Review options**: Customize the choices presented during review
 - **Name**: Label shown to user (e.g., "Fruitful", "Struggled", "No progress")
 - **Score**: Numeric value from 0-5 mapping to SuperMemo 2.0 quality scores
-  - 0-2: Failed recall → interval resets to minimum
-  - 3-5: Successful recall → interval grows by ease factor
+  - 0-2: Interval resets to minimum
+  - 3-5: Interval grows by ease factor
 
 ### Contexts
 
@@ -197,7 +197,7 @@ Configure quick note creation for fleeting thoughts.
 **Note title template**: Template for new note titles
 - Supports template variables (see below)
 - Example: `"Thought - {{date}} {{time}}"`
-- Default: `"{{unixtime}}"` (ensures unique filenames)
+- Default: `"Inbox {{unixtime}}"` (ensures unique filenames)
 
 **Note directory**: Where to create captured thoughts
 - Leave empty for vault root
@@ -206,7 +206,7 @@ Configure quick note creation for fleeting thoughts.
 **New note template**: Initial content for captured thoughts
 - Supports template variables
 - Can include frontmatter, tags, or structure
-- Default: `"{{thought}}"` (just the thought text)
+- Default: `"## Captured thought\n{{thought}}"`
 
 **Include short thought in alias**: Add brief thoughts as note aliases
 - Makes them searchable via Obsidian's quick switcher
@@ -220,7 +220,7 @@ Configure quick note creation for fleeting thoughts.
 
 Bulk vault-wide onboarding with folder exclusion.
 
-**⚠️ Warning**: This modifies potentially hundreds or thousands of files. Create a full vault backup before using.
+**⚠️ Warning**: This modifies potentially hundreds or thousands of files. ALWAYS create a full vault backup before using.
 
 **Excluded folders**: List folders to skip (one per line)
 - Recommended: Template folders, script folders, archive folders
@@ -279,8 +279,8 @@ Review 5: Rate 4 (Good) → Next review in 2.38 days (1 × 2.38)
 
 Unlike traditional flashcard review where you test memorization, Spaced Everything applies the algorithm to creative work:
 
-- **Fruitful reviews** indicate notes where ideas are flowing → space them out more
-- **Unfruitful reviews** indicate notes that need more frequent attention → bring them back sooner
+- **Fruitful reviews** indicate notes where ideas are flowing → bring them back quickly
+- **Unfruitful reviews** indicate notes that need more frequent attention → space them out more
 - The algorithm adapts to your personal rhythm with each note
 
 This creates a dynamic queue that surfaces notes at optimal times for productive engagement, neither too soon (wasting time) nor too late (losing momentum).
@@ -324,13 +324,17 @@ Spaced Everything adds the following frontmatter properties to onboarded notes:
 
 ### Optional Properties
 
-**`se-context`** (string or array)
+**`se-contexts`** (string or array)
 - Context(s) this note belongs to
 - Can be single string or array for multiple contexts
 - Only relevant if you've configured contexts
-- Examples:
-  - `se-context: Work`
-  - `se-context: [Learning, Reference]`
+- Example:
+
+```
+se-contexts:
+  - Learning
+  - Reference
+```
 
 **`se-spacing-method`** (string)
 - Override the spacing method for this specific note
@@ -345,9 +349,12 @@ Spaced Everything adds the following frontmatter properties to onboarded notes:
 se-interval: 7
 se-last-reviewed: 2025-12-18T14:30:00Z
 se-ease: 2.5
-se-context: Learning
+se-contexts:
+  - Learning
 title: SuperMemo 2.0 Algorithm Notes
-tags: [spaced-repetition, learning]
+tags: 
+  - spaced-repetition
+  - learning
 ---
 
 # SuperMemo 2.0 Algorithm Notes
@@ -362,7 +369,7 @@ While the plugin manages these properties automatically, you can manually edit t
 - **Reset a note**: Set `se-interval: 1` to bring it back to the front of the queue
 - **Pause a note**: Set `se-interval` to a very large number (e.g., 10000)
 - **Adjust difficulty**: Modify `se-ease` (higher = easier, lower = harder)
-- **Change context**: Edit `se-context` to move between contexts
+- **Change context**: Edit `se-contexts` to move between contexts
 
 **⚠️ Caution**: Manual edits can disrupt the algorithm's learning. Use sparingly and understand the implications.
 
@@ -418,12 +425,7 @@ Result: `1734520245123.md` - never conflicts with existing notes
 **Structured thought**:
 ```
 Title: "Thought - {{date}}"
-Content: "---
-created: {{date}}T{{time}}
-tags: [inbox, thought]
----
-
-# Quick Thought
+Content: "# Quick Thought
 
 {{thought}}
 
@@ -450,7 +452,7 @@ For power users who want to extend and customize Spaced Everything, see the [Adv
 - **Dashboard Integration**: Embed review queues in daily notes and dashboards
 - **Troubleshooting**: Solutions to common query and integration issues
 
-The Advanced Guide includes community-contributed patterns and examples, with special thanks to [@menkaru](https://github.com/menkaru) for the initial Dataview query contribution.
+The Advanced Guide includes patterns and examples, with thanks to [@menkaru](https://github.com/menkaru) for the initial Dataview query contribution.
 
 ## Future Development
 

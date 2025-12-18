@@ -52,8 +52,8 @@ This query shows all notes currently due for review, regardless of context.
 ````markdown
 ```dataview
 TABLE 
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
+    se-last-reviewed as "Last Reviewed",
+    interval as "Interval (Days)",
     due-date as "Due Date"
     
 FLATTEN dur(se-interval + " d") as interval
@@ -64,6 +64,7 @@ WHERE se-interval != null
     AND due-date <= date(now)
     
 SORT due-date ASC
+LIMIT 50
 ```
 ````
 
@@ -73,6 +74,7 @@ SORT due-date ASC
 - `se-last-reviewed + interval` calculates when the note is next due
 - `WHERE` filters to only show onboarded notes that are currently due
 - `SORT` orders by urgency (oldest due date first)
+- `LIMIT` restricts to only showing the top N results
 
 **Example output:**
 
@@ -84,154 +86,59 @@ SORT due-date ASC
 
 ### Filtered Queue by Context
 
-Filter your review queue to specific contexts (e.g., "Work", "Personal", "Learning").
-
-````markdown
-```dataview
-TABLE 
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
-    due-date as "Due Date",
-    se-contexts as "Contexts"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
-
-WHERE se-interval != null 
-    AND se-last-reviewed != null
-    AND due-date <= date(now)
-    AND contains(se-contexts, "Work")
-    
-SORT due-date ASC
-```
-````
-
-**Customizing the context filter:**
+Filter your review queue to specific contexts (e.g., "Work", "Personal", "Learning"). Add one of the following to the `WHERE` clause:
 
 **Single context:**
-```javascript
-WHERE contains(se-contexts, "Work")
+```sql
+    AND contains(se-contexts, "Work")
 ```
 
 **Multiple contexts (OR logic):**
-```javascript
-WHERE contains(se-contexts, "Work") 
-    OR contains(se-contexts, "Personal")
+```sql
+    AND (contains(se-contexts, "Work") 
+    OR contains(se-contexts, "Personal"))
 ```
 
 **Multiple contexts (AND logic - note must have both):**
-```javascript
-WHERE contains(se-contexts, "Work") 
-    AND contains(se-contexts, "Learning")
+```sql
+    AND (contains(se-contexts, "Work") 
+    AND contains(se-contexts, "Learning"))
 ```
 
 **Exclude a context:**
-```javascript
-WHERE se-contexts != null 
-    AND !contains(se-contexts, "Archive")
+```sql
+    AND (se-contexts != null 
+    AND !contains(se-contexts, "Archive"))
 ```
 
 **Notes:**
 - Context names are case-sensitive: `"Work"` ≠ `"work"`
-- `contains()` works with both string contexts and context arrays
 - Use `se-contexts` (plural) as the property name, not `se-context`
 
 ### Advanced Customizations
 
 #### Show Next 7 Days (Not Just Overdue)
 
-See notes due within the next week, helpful for planning ahead:
+See notes due within the next week, helpful for planning ahead.
 
-````markdown
-```dataview
-TABLE 
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
-    due-date as "Due Date"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
+Change:
 
-WHERE se-interval != null 
-    AND se-last-reviewed != null
+```sql
+    AND due-date <= date(now)
+```
+
+To:
+```sql
     AND due-date <= date(now) + dur(7 d)
-    
-SORT due-date ASC
 ```
-````
-
-#### Add Ease Factor Column
-
-Monitor which notes are easier or harder for you:
-
-````markdown
-```dataview
-TABLE 
-    se-ease as "Ease Factor",
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
-    due-date as "Due Date"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
-
-WHERE se-interval != null 
-    AND se-last-reviewed != null
-    AND due-date <= date(now)
-    
-SORT due-date ASC
-```
-````
-
-**Interpreting ease factors:**
-- **< 2.0**: Difficult material, intervals grow slowly
-- **2.5**: Default, moderate difficulty
-- **> 3.0**: Easy material, intervals grow quickly
-
-#### Limit Results
-
-Show only the top 25 most urgent notes:
-
-````markdown
-```dataview
-TABLE 
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
-    due-date as "Due Date"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
-
-WHERE se-interval != null 
-    AND se-last-reviewed != null
-    AND due-date <= date(now)
-    
-SORT due-date ASC
-LIMIT 25
-```
-````
 
 #### Show Multiple Contexts as Comma-Separated List
 
-Format context arrays nicely:
+Format context arrays nicely by adding the following just after `TABLE`:
 
-````markdown
-```dataview
-TABLE 
+```sql
     join(se-contexts, ", ") as "Contexts",
-    se-last-reviewed as "Last Reviewed", 
-    due-date as "Due Date"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
-
-WHERE se-interval != null 
-    AND se-last-reviewed != null
-    AND due-date <= date(now)
-    
-SORT due-date ASC
 ```
-````
 
 **Output example:**
 - `Work, Learning` (note has two contexts)
@@ -245,8 +152,8 @@ Show how many days past due each note is:
 ````markdown
 ```dataview
 TABLE 
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
+    se-last-reviewed as "Last Reviewed",
+    interval as "Interval (Days)",
     due-date as "Due Date",
     days-overdue as "Days Overdue"
     
@@ -259,6 +166,7 @@ WHERE se-interval != null
     AND due-date <= date(now)
     
 SORT due-date ASC
+LIMIT 50
 ```
 ````
 
@@ -269,8 +177,8 @@ Organize your queue by context:
 ````markdown
 ```dataview
 TABLE 
-    se-last-reviewed as "Last Reviewed", 
-    interval as "Interval (Days)", 
+    se-last-reviewed as "Last Reviewed",
+    interval as "Interval (Days)",
     due-date as "Due Date"
     
 FLATTEN dur(se-interval + " d") as interval
@@ -282,6 +190,7 @@ WHERE se-interval != null
     
 GROUP BY se-contexts
 SORT due-date ASC
+LIMIT 50
 ```
 ````
 
@@ -289,23 +198,16 @@ SORT due-date ASC
 
 Display dates in your preferred format:
 
-````markdown
-```dataview
-TABLE 
-    dateformat(se-last-reviewed, "MMM dd, yyyy") as "Last Reviewed", 
-    interval as "Interval (Days)", 
-    dateformat(due-date, "MMM dd, yyyy HH:mm") as "Due Date"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
+Change:
 
-WHERE se-interval != null 
-    AND se-last-reviewed != null
-    AND due-date <= date(now)
-    
-SORT due-date ASC
+```sql
+    se-last-reviewed as "Last Reviewed",
 ```
-````
+
+To:
+```sql
+    dateformat(se-last-reviewed, "MMM dd, yyyy") as "Last Reviewed",
+```
 
 **Common date format patterns:**
 - `"yyyy-MM-dd"`: 2025-12-18
@@ -366,15 +268,11 @@ SORT due-date ASC
 
 **Possible causes:**
 
-1. **Large vault (thousands of notes)**
-   - Solution: Add `LIMIT` to restrict results
-   - Example: `LIMIT 50` at the end of the query
-
-2. **Complex WHERE conditions**
+1. **Complex WHERE conditions**
    - Solution: Simplify filters or create multiple simpler queries
    - Tip: Check each WHERE condition independently
 
-3. **Dataview cache is stale**
+2. **Dataview cache is stale**
    - Solution: Settings → Dataview → Refresh Index
 
 ## Integration Ideas
@@ -442,28 +340,6 @@ SORT se-last-reviewed DESC
 [7-day lookahead query]
 ````
 
-### Combine with Other Dataview Queries
-
-Mix spaced repetition data with other metadata:
-
-````markdown
-```dataview
-TABLE 
-    tags as "Tags",
-    se-ease as "Ease",
-    due-date as "Due Date"
-    
-FLATTEN dur(se-interval + " d") as interval
-FLATTEN se-last-reviewed + interval as due-date
-
-WHERE se-interval != null 
-    AND due-date <= date(now)
-    AND contains(tags, "#project")
-    
-SORT due-date ASC
-```
-````
-
 ## Contributing
 
 These query patterns originated from the Spaced Everything community. Special thanks to [@menkaru](https://github.com/menkaru) for contributing the initial query example on [GitHub Issue #21](https://github.com/zachmueller/spaced-everything/issues/21).
@@ -476,9 +352,4 @@ These query patterns originated from the Spaced Everything community. Special th
 **Ideas for future contributions:**
 - Queries for Obsidian's built-in Bases plugin
 - Statistics and analytics queries
-- Visualizations using Dataview's chart capabilities
 - Integration patterns with other plugins
-
----
-
-*This guide focuses on Dataview integration. For core plugin documentation, see the main [README](../README.md). For term definitions, see the [Glossary](Glossary.md).*

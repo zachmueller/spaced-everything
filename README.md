@@ -445,7 +445,7 @@ Content: "# Quick Thought
 
 ## Advanced Usage
 
-For power users who want to extend and customize Spaced Everything, see the [Advanced Usage Guide](docs/Advanced-Guide.md). This guide covers:
+For power users who want to extend and customize Spaced Everything, see the [Dataview Queries Guide](docs/Dataview-queries.md). This guide covers:
 
 - **Visualizing Your Review Queue**: Create custom Dataview queries to see your entire review queue at once
 - **Context Filtering**: Advanced filtering techniques for organizing reviews

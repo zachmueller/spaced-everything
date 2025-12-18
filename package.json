@@ -1,6 +1,6 @@
 {
 	"name": "spaced-everything",
-	"version": "1.0.0",
+	"version": "1.3.4",
 	"description": "Apply spaced repetition algorithms to everything in your vault.",
 	"main": "main.js",
 	"scripts": {

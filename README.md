@@ -13,6 +13,7 @@ Borrowing from Andy Matuschak's [notes](https://notes.andymatuschak.org/About_th
 - [Understanding SuperMemo 2.0](#understanding-supermemo-20)
 - [Frontmatter Properties](#frontmatter-properties)
 - [Template Variables](#template-variables)
+- [Advanced Usage](#advanced-usage)
 - [Future Development](#future-development)
 
 ## Installation
@@ -439,6 +440,17 @@ tags: [inbox, thought]
 - Include frontmatter in content templates for better organization
 - Keep title templates short (Obsidian has filename length limits)
 - Test templates before relying on them for important captures
+
+## Advanced Usage
+
+For power users who want to extend and customize Spaced Everything, see the [Advanced Usage Guide](docs/Advanced-Guide.md). This guide covers:
+
+- **Visualizing Your Review Queue**: Create custom Dataview queries to see your entire review queue at once
+- **Context Filtering**: Advanced filtering techniques for organizing reviews
+- **Dashboard Integration**: Embed review queues in daily notes and dashboards
+- **Troubleshooting**: Solutions to common query and integration issues
+
+The Advanced Guide includes community-contributed patterns and examples, with special thanks to [@menkaru](https://github.com/menkaru) for the initial Dataview query contribution.
 
 ## Future Development
 

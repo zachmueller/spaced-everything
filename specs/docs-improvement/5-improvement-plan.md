@@ -701,8 +701,8 @@ Simple helpers, well-understood code, optional enhancements
 - [x] **suggester.ts: File header** - `suggester.ts` - S - Explain reusable modal component
 - [x] **suggester.ts: Class documentation** - `suggester.ts` - M - Document modal class
 - [x] **suggester.ts: suggester() function** - `suggester.ts` - M - Document promise wrapper
-- [ ] **README.md: Installation** - `README.md` - S - Add installation instructions
-- [ ] **README.md: Getting Started** - `README.md` - M - Create walkthrough with examples
+- [x] **README.md: Installation** - `README.md` - S - Add installation instructions
+- [x] **README.md: Getting Started** - `README.md` - M - Create walkthrough with examples
 
 **Total P1 Effort:** 7.0 hours
 
@@ -715,12 +715,12 @@ Simple helpers, well-understood code, optional enhancements
 - [x] **settings.ts: display() overview** - `settings.ts` - M - Add method overview comment
 - [x] **settings.ts: isFileExcluded()** - `settings.ts` - M - Document folder traversal logic
 - [x] **main.ts: Template processing** - `main.ts` - M - Document variable replacement
-- [ ] **README.md: Configuration** - `README.md` - M - Explain all settings in detail
-- [ ] **README.md: Frontmatter properties** - `README.md` - S - Document se-* properties
-- [ ] **README.md: SuperMemo explanation** - `README.md` - M - User-friendly algorithm explanation
-- [ ] **README.md: Template variables** - `README.md` - S - Document {{}} variables
-- [ ] **Glossary.md: Migrate content** - `docs/Glossary.md` - M - Add all terminology definitions
-- [ ] **Glossary.md: SuperMemo terms** - `docs/Glossary.md` - S - Add algorithm terminology
+- [x] **README.md: Configuration** - `README.md` - M - Explain all settings in detail
+- [x] **README.md: Frontmatter properties** - `README.md` - S - Document se-* properties
+- [x] **README.md: SuperMemo explanation** - `README.md` - M - User-friendly algorithm explanation
+- [x] **README.md: Template variables** - `README.md` - S - Document {{}} variables
+- [x] **Glossary.md: Migrate content** - `docs/Glossary.md` - M - Add all terminology definitions
+- [x] **Glossary.md: SuperMemo terms** - `docs/Glossary.md` - S - Add algorithm terminology
 
 **Total P2 Effort:** 2.5 hours
 

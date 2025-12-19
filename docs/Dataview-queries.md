@@ -2,6 +2,8 @@
 
 This guide covers advanced customization and integration patterns for power users of Spaced Everything. For basic setup and usage, refer to the main [README](../README.md).
 
+> **Alternative Approach:** If you prefer a built-in solution without plugins, see the [Bases Query Guide](./Bases-queries.md) which achieves similar functionality using Obsidian's native Bases feature. Both approaches are valid - Dataview offers more query flexibility and types, while Bases requires no plugin installation.
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)

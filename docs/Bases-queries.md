@@ -2,6 +2,8 @@
 
 This guide covers advanced customization using Obsidian's built-in Bases functionality for power users of Spaced Everything. For basic setup and usage, refer to the main [README](../README.md).
 
+> **Alternative Approach:** If you prefer a plugin-based solution with more query flexibility, see the [Dataview Query Guide](./Dataview-queries.md) which achieves similar functionality using the Dataview plugin. Both approaches are valid - Bases is built-in and UI-based, while Dataview offers more advanced querying capabilities.
+
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
@@ -28,7 +30,7 @@ Bases is Obsidian's built-in database functionality introduced in recent version
 3. Create a new Base or open an existing one
 
 **Learning Bases:**
-- [Obsidian Bases Documentation](https://help.obsidian.md/Plugins/Bases)
+- [Obsidian Bases Documentation](https://help.obsidian.md/bases)
 - Bases uses a JSON-like query structure with filters, formulas, and views
 - Bases automatically indexes your vault's properties (frontmatter)
 
@@ -69,7 +71,7 @@ filters:
     - file.hasProperty('se-last-reviewed')
 formulas:
   due_date: date(note["se-last-reviewed"]) + duration((note["se-interval"]*24*60*60).round(0) + "s")
-  is_due: formula.due_date <= date(now)
+  is_due: if(formula.due_date<=now(), True, False)
 properties:
   formula.due_date:
     displayName: Due Date
@@ -84,10 +86,11 @@ views:
     name: Current Review Queue
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
     order:
       - file.name
       - formula.due_date
+      - formula.is_due
     sort:
       - property: formula.due_date
         direction: ASC
@@ -97,9 +100,9 @@ views:
 **How it works:**
 - **filters**: Only includes notes with both `se-interval` and `se-last-reviewed` properties
 - **formulas.due_date**: Calculates when the note is next due by adding interval (converted to seconds) to last reviewed date
-- **formulas.is_due**: Boolean check if the note is currently overdue
+- **formulas.is_due**: Boolean check if the note is currently overdue using an if statement
 - **properties**: Defines which properties to display and their labels
-- **views.filters**: Filters the table view to only show notes where `is_due = true`
+- **views.filters**: Filters the table view to only show notes where `is_due == True`
 - **views.sort**: Orders by due date, oldest first (most urgent)
 - **views.limit**: Restricts to showing top 50 results
 
@@ -115,28 +118,16 @@ views:
 
 Filter your review queue to specific contexts (e.g., "work", "personal", "learning"). Modify the view filters to include context checks:
 
-**Single context:**
-```base
-views:
-  - type: table
-    name: Work Review Queue
-    filters:
-      and:
-        - formula.is_due = true
-        - note["se-contexts"].contains("work")
-```
-
-**Multiple contexts (OR logic):**
+**Single or multiple contexts (OR logic):**
 ```base
 views:
   - type: table
     name: Work or Personal Queue
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
         - or:
-          - note["se-contexts"].contains("work")
-          - note["se-contexts"].contains("personal")
+          - note["se-contexts"].containsAny("work", "personal")
 ```
 
 **Multiple contexts (AND logic - note must have both):**
@@ -146,7 +137,7 @@ views:
     name: Work AND Learning Queue
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
         - note["se-contexts"].contains("work")
         - note["se-contexts"].contains("learning")
 ```
@@ -158,7 +149,7 @@ views:
     name: Non-Archive Queue
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
         - not:
           - note["se-contexts"].contains("archive")
 ```
@@ -170,39 +161,16 @@ views:
     name: Multi-Context Queue
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
         - note["se-contexts"].containsAny("work", "personal", "learning")
 ```
 
 **Notes:**
 - Context names are case-sensitive: `"work"` ≠ `"Work"`
 - Use `note["se-contexts"]` to access the property
-- The `.contains()` and `.containsAny()` methods work with array properties
+- The `.containsAny()` method works with array properties
 
 ### Advanced Customizations
-
-#### Show Next 7 Days (Not Just Overdue)
-
-See notes due within the next week, helpful for planning ahead.
-
-Add a formula for the 7-day threshold:
-
-```base
-formulas:
-  due_date: date(note["se-last-reviewed"]) + duration((note["se-interval"]*24*60*60).round(0) + "s")
-  is_due_soon: formula.due_date <= date(now) + duration("7d")
-```
-
-Then update the view filter:
-
-```base
-views:
-  - type: table
-    name: Next 7 Days
-    filters:
-      and:
-        - formula.is_due_soon = true
-```
 
 #### Show Multiple Contexts
 
@@ -216,27 +184,6 @@ properties:
 
 Bases will automatically display array properties as comma-separated values.
 
-#### Calculate Days Overdue
-
-Add a formula to calculate how many days past due each note is:
-
-```base
-formulas:
-  due_date: date(note["se-last-reviewed"]) + duration((note["se-interval"]*24*60*60).round(0) + "s")
-  is_due: formula.due_date <= date(now)
-  days_overdue: (date(now) - formula.due_date).days().round(0)
-```
-
-Then add it to your properties:
-
-```base
-properties:
-  formula.days_overdue:
-    displayName: Days Overdue
-```
-
-**Note:** The `days_overdue` formula will show negative values for notes not yet due. You can filter these out in the view or add conditional logic.
-
 #### Multiple Views in One Base
 
 Create different views for different purposes within a single Base:
@@ -247,7 +194,7 @@ views:
     name: Overdue Now
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
     sort:
       - property: formula.due_date
         direction: ASC
@@ -267,7 +214,7 @@ views:
     name: Work Context Only
     filters:
       and:
-        - formula.is_due = true
+        - formula.is_due == True
         - note["se-contexts"].contains("work")
     sort:
       - property: formula.due_date
@@ -298,10 +245,6 @@ views:
       - formula.due_date
       - note.se-ease
 ```
-
-#### Custom Date Formatting
-
-Bases uses ISO 8601 format by default. For custom formatting, you may need to create a formula that converts the date to your preferred format, or rely on Obsidian's display settings.
 
 ## Query Structure Reference
 
@@ -367,7 +310,7 @@ views:                      # Display configurations
 
 2. **No notes are currently due**
    - Solution: Remove or adjust the `is_due` filter in the view
-   - Test: Create a view without the `formula.is_due = true` filter to see all tracked notes
+   - Test: Create a view without the `formula.is_due == True` filter to see all tracked notes
 
 3. **Bases isn't indexing your properties**
    - Solution: Close and reopen the Base

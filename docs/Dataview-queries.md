@@ -1,4 +1,4 @@
-# Advanced Usage Guide
+# Dataview Query Guide
 
 This guide covers advanced customization and integration patterns for power users of Spaced Everything. For basic setup and usage, refer to the main [README](../README.md).
 
@@ -80,8 +80,8 @@ LIMIT 50
 
 | File | Last Reviewed | Interval (Days) | Due Date |
 |------|---------------|-----------------|----------|
-| Project Ideas | 2025-12-10T14:00:00 | 7 days | 2025-12-17T14:00:00 |
 | Meeting Notes | 2025-12-11T09:30:00 | 5 days | 2025-12-16T09:30:00 |
+| Project Ideas | 2025-12-10T14:00:00 | 7 days | 2025-12-17T14:00:00 |
 | Research Paper | 2025-12-15T16:45:00 | 2 days | 2025-12-17T16:45:00 |
 
 ### Filtered Queue by Context

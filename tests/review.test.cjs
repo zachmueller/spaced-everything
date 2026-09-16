@@ -23,21 +23,20 @@ test('review integration preserves defaults, frontmatter fields, logging and not
     const metadata = { ...c.fields, unrelated: 'preserved' };
     const initial = { ...metadata };
     const logs = [];
-    const queued = [];
+    let persisted = false;
     plugin.settings = { logFilePath: 'reviews.jsonl' };
-    plugin.logger = { log: (...args) => logs.push(args) };
+    plugin.logger = { log: (...args) => { assert.ok(persisted); logs.push(args); } };
     plugin.app = { fileManager: { processFrontMatter: async (target, callback) => {
       assert.equal(target, file);
       callback(metadata);
+      persisted = true;
     } } };
-    plugin.queueFrontmatterUpdate = (target, updates) => queued.push({ target, updates });
-    const result = await plugin.updateInterval(file, {}, c.score, '2026-09-16', c.defaults);
+    const result = await plugin.updateInterval(file, {}, c.score, '2026-09-16', { ...c.defaults, spacingAlgorithm: 'SuperMemo2.0' });
     assert.deepEqual(result, { newInterval: c.interval, newEaseFactor: c.ease });
-    assert.deepEqual(metadata, initial, 'calculation must leave persistence to the queue');
-    assert.deepEqual(queued, [{ target: file, updates: {
+    assert.deepEqual(metadata, { ...initial,
       'se-interval': c.interval, 'se-ease': c.ease, 'se-last-reviewed': '2026-09-16'
-    } }]);
-    assert.deepEqual(logs, [['review', file, metadata, c.score, c.interval, c.ease]]);
+    });
+    assert.deepEqual(logs, [['review', file, initial, c.score, c.interval, c.ease]]);
     assert.equal(notices.pop(), `Interval updated from ${c.previous} to ${c.interval}`);
   }
 });

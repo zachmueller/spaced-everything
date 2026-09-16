@@ -4,7 +4,7 @@ import { Logger } from './logger';
 import { SpacedEverythingPluginSettings, SpacedEverythingSettingTab } from './settings';
 import { Suggester, suggester } from './suggester';
 import { FrontmatterQueue } from './frontmatterQueue';
-import { superMemo } from './scheduling';
+import { calculateSchedule, loadScheduler } from './customScheduler';
 
 /**
  * SpacedEverythingPlugin - Main plugin orchestrator for spaced repetition in Obsidian
@@ -750,7 +750,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 	 * 
 	 * This is the main review workflow command that users trigger after reviewing a note.
 	 * It presents the user with review quality options (configured per spacing method),
-	 * calculates a new interval using SuperMemo 2.0, and updates the note's frontmatter.
+	 * calculates a new interval using the selected scheduler, and saves the note's frontmatter.
 	 * 
 	 * Workflow:
 	 * 1. Check if note is already onboarded (has se-interval property)
@@ -764,7 +764,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 	 * repetition system entirely, deleting all se-* frontmatter properties.
 	 * 
 	 * Side effects:
-	 * - Queues frontmatter updates (se-interval, se-ease, se-last-reviewed)
+	 * - Persists review frontmatter (se-interval, se-ease, se-last-reviewed)
 	 * - Shows notices to user about interval changes
 	 * - Logs to JSONL file if logging enabled
 	 * 
@@ -833,7 +833,12 @@ export default class SpacedEverythingPlugin extends Plugin {
 				}
 
 				// perform action to update the interval
-				const { newInterval, newEaseFactor } = await this.updateInterval(activeFile, frontmatter, selectedOption.score, nowFormatted, activeSpacingMethod);
+				try {
+					await this.updateInterval(activeFile, frontmatter, selectedOption.score, nowFormatted, activeSpacingMethod);
+				} catch (error) {
+					new Notice(`Review could not be saved: ${error instanceof Error ? error.message : String(error)}`);
+					return;
+				}
 			}
 		} else {
 			await this.onboardNoteToSpacedEverything(activeFile, frontmatter);
@@ -1134,54 +1139,48 @@ export default class SpacedEverythingPlugin extends Plugin {
 	}
 
 	/**
-	 * Read the note's scheduling state and delegate calculation to superMemo.
+	 * Load the selected scheduler, then calculate against fresh frontmatter.
+	 * Defaults and numeric conversion retain the existing SuperMemo behavior.
 	 *
-	 * Resolve numeric values from current frontmatter, falling back to the active
-	 * method's defaults and then 1 day / ease 2.5. The existing truthy fallback
-	 * behavior is preserved, so numeric zero also falls back to a default.
-	 *
-	 * This integration layer logs the review when enabled, queues se-interval,
-	 * se-ease, and se-last-reviewed, and displays an interval-change notice.
-	 * Queuing does not persist those updates: the caller must subsequently await
-	 * processFrontmatterQueue(). Logging and the notice precede that persistence.
+	 * The synchronous scheduler runs inside processFrontMatter so calculation and
+	 * assignment share the same current state. Its full result is validated before
+	 * any review fields are assigned. Reviews are persisted directly in this single
+	 * transaction, not placed in the shared queue where a failed write could leave
+	 * stale review metadata for a later command to apply. Success is reported only
+	 * after the write resolves. Other commands continue using the metadata queue.
 	 *
 	 * @param file - Note being reviewed
-	 * @param frontmatter - Retained caller snapshot; scheduling and logging use the fresh API callback value
-	 * @param reviewScore - Numeric score associated with the selected review option
-	 * @param nowFormatted - Review timestamp already formatted by the caller
-	 * @param activeSpacingMethod - Configuration supplying fallback interval and ease
-	 * @returns Calculated interval in days and ease factor, before queued persistence
+	 * @param frontmatter - Caller snapshot retained for API compatibility; fresh state is read below
+	 * @param reviewScore - Selected option's finite numeric score
+	 * @param nowFormatted - Review timestamp formatted by the caller
+	 * @param activeSpacingMethod - Algorithm, script path, and fallback values
+	 * @returns Persisted interval in days and ease factor
 	 */
 	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, nowFormatted: string, activeSpacingMethod: SpacingMethod): Promise<{ newInterval: number; newEaseFactor: number; }> {
+		const scheduler = await loadScheduler(activeSpacingMethod, path => this.app.vault.adapter.read(path));
 		let prevInterval = 1;
-		let prevEaseFactor = 2.5;
 		let newInterval = 0;
 		let newEaseFactor = 0;
+		let previousFrontmatter: Record<string, unknown> = {};
 
-		await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			// Get the previous interval and ease factor from the frontmatter
-			prevInterval = Number(frontmatter['se-interval'] || activeSpacingMethod?.defaultInterval || 1);
-			prevEaseFactor = Number(frontmatter['se-ease'] || activeSpacingMethod?.defaultEaseFactor || 2.5);
-
-			const result = superMemo({ interval: prevInterval, easeFactor: prevEaseFactor, reviewScore });
+		await this.app.fileManager.processFrontMatter(file, (current) => {
+			prevInterval = Number(current['se-interval'] || activeSpacingMethod.defaultInterval || 1);
+			const easeFactor = Number(current['se-ease'] || activeSpacingMethod.defaultEaseFactor || 2.5);
+			const result = calculateSchedule(scheduler, { interval: prevInterval, easeFactor, reviewScore });
 			newInterval = result.interval;
 			newEaseFactor = result.easeFactor;
-
-			if (this.settings.logFilePath) {
-				this.logger.log('review', file, frontmatter, reviewScore, newInterval, newEaseFactor);
-			}
+			previousFrontmatter = { ...current };
+			Object.assign(current, {
+				'se-interval': newInterval,
+				'se-ease': newEaseFactor,
+				'se-last-reviewed': nowFormatted
+			});
 		});
 
-		// Update the frontmatter with the new interval and ease factor
-		await this.queueFrontmatterUpdate(file, {
-			'se-interval': newInterval,
-			'se-ease': newEaseFactor,
-			'se-last-reviewed': nowFormatted
-		});
-
-		// Notify the user of the interval change
+		if (this.settings.logFilePath) {
+			await this.logger.log('review', file, previousFrontmatter, reviewScore, newInterval, newEaseFactor);
+		}
 		new Notice(`Interval updated from ${prevInterval} to ${newInterval}`);
-
 		return { newInterval, newEaseFactor };
 	}
 

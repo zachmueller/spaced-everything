@@ -81,7 +81,7 @@ The SuperMemo 2.0 algorithm automatically adjusts intervals based on your feedba
 
 Taking from Andy's proposed idea, when reviewing a note you can select among three options for how the review went: Fruitful, Unfruitful, or Ignore. Fruitful means you made good progress on the note; this guides the spacing algorithm to include the note again soon in your queue. Unfruitful means you tried to engage with the note but progress was limited; this pushes that note out further in your queue. Ignore is an in-between option.
 
-You may customize these options for this review process. You may add or delete options and change their numeric value. Currently, the only spacing algorithm implemented is the SuperMemo 2.0 algorithm. The numeric value provided in the settings alongside each review option maps to the "review quality score" from that algorithm.
+You may customize these options for this review process. You may add or delete options and change their numeric value. Choose SuperMemo 2.0 or a [custom JavaScript scheduling algorithm](docs/Custom-algorithms.md). For SuperMemo, each numeric value maps to its review quality score; custom scripts interpret scores according to their own policy.
 
 **Command**: `Spaced Everything: Log review outcome`
 
@@ -129,8 +129,7 @@ Configure the algorithms and parameters that control review intervals.
 
 **Default interval**: Starting interval in days for newly onboarded notes (default: 1)
 
-**Spacing algorithm**: Currently only SuperMemo 2.0 is supported
-- Future releases will support custom algorithms
+**Spacing algorithm**: Choose SuperMemo 2.0 or Custom script. For Custom, enter a vault-relative `.js` path. See the [custom algorithm guide](docs/Custom-algorithms.md) and [Evergreen writing example](examples/evergreen.js). Only use trusted scripts: they run with Obsidian privileges without a sandbox.
 
 **Default ease factor**: Controls how quickly intervals grow (default: 2.5)
 - Higher values = faster growth
@@ -458,7 +457,6 @@ The Advanced Guide includes patterns and examples, with thanks to [@menkaru](htt
 
 Possible future development:
 - Implement other spacing algorithms (enabling distinct spacing algorithms per each context)
-- Enable users to create their own custom spacing algorithm scripts to extend to a deeper level of control in the spacing behavior
 - More flexible context filtering (AND logic, exclusion rules)
 - Statistics and analytics dashboard
 - Export/import of review history

@@ -108,7 +108,7 @@ interface SpacedEverythingPluginSettings {
 	/**
 	 * Array of spacing method configurations
 	 * 
-	 * Each spacing method defines an algorithm (currently only SuperMemo 2.0)
+	 * Each spacing method defines an algorithm (SuperMemo 2.0 or a custom script)
 	 * and its parameters. Methods can be mapped to specific contexts to allow
 	 * different review schedules for different types of notes.
 	 * 
@@ -706,22 +706,15 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		const customScriptSettingContainer = generalSettingsDiv.createDiv();
 		const customScriptSetting = new Setting(customScriptSettingContainer)
 			.setName('Custom script')
-			.setDesc('>>>NOT YET IMPLEMENTED<<< —— Input the location of your custom script file that implements a spacing algorithm')
+			.setDesc('Vault-relative .js path exporting a synchronous function with module.exports. Reloaded each review. Only use trusted scripts: they run with Obsidian privileges, without a sandbox.')
 			.addText((text) =>
 				text
-				.setPlaceholder('Custom script file name')
+				.setPlaceholder('scripts/evergreen.js')
 				.setValue(spacingMethod.customScriptFileName)
 				.onChange(async (value) => {
-					// TODO: Implement file path autocomplete for custom script selection
-					// Context: Users need to manually type the full path to their custom
-					// algorithm script file, which is error-prone
-					// Priority: Medium - Would improve UX once custom scripts are supported
-					// Blocked by: Custom script functionality (not yet implemented)
-					// Suggested fix: Add file suggester modal similar to Obsidian's file picker
 					spacingMethod.customScriptFileName = value;
 					await this.plugin.saveSettings();
 				})
-				.setDisabled(true)
 			);
 
 		const defaultEaseFactorSettingContainer = generalSettingsDiv.createDiv();
@@ -752,7 +745,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 		new Setting(reviewOptionsDiv)
 			.setHeading()
 			.setName('Review options')
-			.setDesc('Customize the review options and scores to use in this spacing method. For the SuperMemo-2.0 spacing algorithm, review scores must be a number from 0 to 5.');
+			.setDesc('Customize the review options and scores to use in this spacing method. SuperMemo scores must be from 0 to 5. Custom scripts may use any finite numeric score.');
 
 		const addReviewOptionDiv = reviewOptionsDiv.createDiv();
 		new Setting(addReviewOptionDiv)
@@ -846,12 +839,13 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				.setPlaceholder('Review score')
 				.setValue(option.score.toString())
 				.onChange(async (value) => {
-					const numericValue = parseFloat(value);
-					if (value === '' || (!isNaN(numericValue) && numericValue >= 0 && numericValue <= 5)) {
+					const numericValue = Number(value);
+					const custom = this.plugin.settings.spacingMethods[spacingMethodIndex].spacingAlgorithm === 'Custom';
+					if (value.trim() !== '' && Number.isFinite(numericValue) && (custom || (numericValue >= 0 && numericValue <= 5))) {
 						option.score = numericValue;
 						await this.plugin.saveSettings();
 					} else {
-						new Notice('Review score must be a number from 0 to 5');
+						new Notice(custom ? 'Review score must be a finite number' : 'Review score must be a number from 0 to 5');
 					}
 				})
 			)

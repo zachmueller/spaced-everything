@@ -14,7 +14,7 @@ export function scriptPath(value: string): string {
 	const path = value.trim();
 	if (!path || !path.endsWith('.js') || /[\\:\x00-\x1f]/.test(path) ||
 		path.split('/').some(part => !part || part === '.' || part === '..')) {
-		throw new Error('Set Custom script to a vault-relative .js path, such as scripts/evergreen.js (no absolute paths or ..).');
+		throw new Error('Set Custom script to a vault-relative .js path, such as scripts/custom-scheduler.js (no absolute paths or ..).');
 	}
 	return path;
 }

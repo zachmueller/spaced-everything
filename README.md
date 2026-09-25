@@ -129,7 +129,7 @@ Configure the algorithms and parameters that control review intervals.
 
 **Default interval**: Starting interval in days for newly onboarded notes (default: 1)
 
-**Spacing algorithm**: Choose SuperMemo 2.0 or Custom script. For Custom, enter a vault-relative `.js` path. See the [custom algorithm guide](docs/Custom-algorithms.md) and [Evergreen writing example](examples/evergreen.js). Only use trusted scripts: they run with Obsidian privileges without a sandbox.
+**Spacing algorithm**: Choose SuperMemo 2.0 or Custom script. For Custom, enter a vault-relative `.js` path. See the [custom algorithm guide](docs/Custom-algorithms.md) and [basic script example](examples/custom-scheduler.js). Only use trusted scripts: they run with Obsidian privileges without a sandbox.
 
 **Default ease factor**: Controls how quickly intervals grow (default: 2.5)
 - Higher values = faster growth

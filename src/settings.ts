@@ -709,7 +709,7 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			.setDesc('Vault-relative .js path exporting a synchronous function with module.exports. Reloaded each review. Only use trusted scripts: they run with Obsidian privileges, without a sandbox.')
 			.addText((text) =>
 				text
-				.setPlaceholder('scripts/evergreen.js')
+				.setPlaceholder('scripts/custom-scheduler.js')
 				.setValue(spacingMethod.customScriptFileName)
 				.onChange(async (value) => {
 					spacingMethod.customScriptFileName = value;

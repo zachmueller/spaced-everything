@@ -695,6 +695,12 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 				})
 				.setValue(spacingMethod.spacingAlgorithm)
 				.onChange(async (value) => {
+					if (value === 'SuperMemo2.0' && spacingMethod.reviewOptions.some(option =>
+						!Number.isFinite(option.score) || option.score < 0 || option.score > 5)) {
+						dropdown.setValue(spacingMethod.spacingAlgorithm);
+						new Notice('Correct all review scores to numbers from 0 to 5 before switching to SuperMemo 2.0.');
+						return;
+					}
 					spacingMethod.spacingAlgorithm = value;
 					await this.plugin.saveSettings();
 					// Update the visibility of the settings based on the selected value

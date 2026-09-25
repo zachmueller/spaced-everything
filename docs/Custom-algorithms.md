@@ -30,6 +30,8 @@ module.exports = ({ interval, easeFactor, reviewScore }) => {
 | `easeFactor` | Previous ease, or the method/plugin fallback; positive and finite |
 | `reviewScore` | Selected option's finite numeric score; custom scores may be outside 0–5 |
 
+Before switching a Custom method to SuperMemo 2.0, correct every review score to a finite number from 0 to 5. The settings view blocks the switch and displays a notice until all scores are compatible.
+
 The input is a fresh frozen object. The intended function is pure: calculate from these values and return a result without I/O, global mutation, or note edits.
 
 Return an object with a **positive finite numeric `interval`** in days. You may also return a positive finite numeric `easeFactor`; omit it to preserve the input ease. Fractional intervals are supported without custom-result rounding. Other returned properties are ignored and cannot be used as frontmatter patches. The current input retains the plugin's existing frontmatter-to-number conversion and fallback defaults.

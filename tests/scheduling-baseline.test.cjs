@@ -41,7 +41,7 @@ async function review(prevInterval, prevEase, score) {
 	const harness = createPluginHarness({
 		frontmatter: { "se-interval": prevInterval, "se-ease": prevEase },
 	});
-	const method = { defaultInterval: 999, defaultEaseFactor: 9.99 };
+	const method = { spacingAlgorithm: "SuperMemo2.0", defaultInterval: 999, defaultEaseFactor: 9.99 };
 
 	return harness.plugin.updateInterval(harness.file, {}, score, "2026-01-01T00:00:00Z", method);
 }
@@ -248,11 +248,6 @@ test("scores outside 0-5 are neither rejected nor clamped", async () => {
 	assert.deepEqual(await review(7, 2.5, -10), { newInterval: 1, newEaseFactor: 1.3 });
 });
 
-test("a non-numeric score produces NaN rather than an error", async () => {
-	// Recorded, not endorsed: NaN reaches the frontmatter and the notice. Worth
-	// knowing before anyone adds validation and calls it a refactor.
-	const { newInterval, newEaseFactor } = await review(7, 2.5, Number.NaN);
-
-	assert.ok(Number.isNaN(newInterval));
-	assert.ok(Number.isNaN(newEaseFactor));
+test("a non-numeric score is rejected before persistence", async () => {
+	await assert.rejects(review(7, 2.5, Number.NaN), /finite review score/);
 });

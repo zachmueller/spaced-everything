@@ -42,8 +42,12 @@ test('review score settings accept finite custom scores but keep SuperMemo range
   assert.match(notices.pop(), /0 to 5/);
 });
 
-test('Evergreen example matches documented policy and caps long intervals', () => {
-  const schedule = require('../examples/evergreen.js');
+test('Evergreen example matches documented policy and caps long intervals', async () => {
+  const { loadScheduler } = load('src/customScheduler.ts');
+  const schedule = await loadScheduler(
+    { spacingAlgorithm: 'Custom', customScriptFileName: 'examples/evergreen.js' },
+    path => require('node:fs/promises').readFile(path, 'utf8')
+  );
   assert.deepEqual(schedule({ interval: 7, reviewScore: 1 }), { interval: 1 });
   assert.deepEqual(schedule({ interval: 7, reviewScore: 3 }), { interval: 10.5 });
   assert.deepEqual(schedule({ interval: 7, reviewScore: 5 }), { interval: 14 });

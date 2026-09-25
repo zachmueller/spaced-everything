@@ -42,4 +42,4 @@ A missing script, syntax error, wrong export, thrown exception, or invalid resul
 
 **Use only scripts you wrote or trust.** Scripts execute with Obsidian's host privileges. Freezing the input is not a sandbox and cannot prevent a script from accessing globals or causing side effects. A synchronous infinite loop can freeze the application; there is no execution timeout. These failure guarantees cover the plugin's own metadata updates, not side effects caused by script code.
 
-Loading uses Obsidian's vault adapter rather than desktop filesystem APIs. This implementation has automated tests with mocked Obsidian APIs; live desktop and mobile smoke tests are still needed before claiming platform compatibility.
+Loading uses Obsidian's vault adapter rather than desktop filesystem APIs. Automated tests cover scheduling and persistence with mocked Obsidian APIs. Desktop smoke tests confirmed a successful custom review and an error for a missing script without changing review metadata. Mobile compatibility has not been smoke-tested.

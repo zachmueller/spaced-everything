@@ -78,20 +78,15 @@ test("the chosen option's score is what reaches the calculation", async () => {
 	}
 });
 
-test("a review flushes the frontmatter queue exactly once, after queueing", async () => {
+test("a review persists its schedule directly and flushes the remaining queue once", async () => {
 	const harness = createPluginHarness({ frontmatter: ONBOARDED });
 	harness.answerSuggester("Unfruitful");
-
 	await harness.plugin.logReviewOutcome();
-
-	assert.equal(harness.processedQueue.length, 1, "the queue must be flushed once");
-	assert.deepEqual(harness.processedQueue[0], [
-		{
-			"se-interval": 18.2,
-			"se-ease": 2.6,
-			"se-last-reviewed": harness.queued[0].updates["se-last-reviewed"],
-		},
-	]);
+	assert.deepEqual(harness.processedQueue, [[]]);
+	assert.deepEqual(harness.queued, []);
+	assert.equal(harness.frontmatter["se-interval"], 18.2);
+	assert.equal(harness.frontmatter["se-ease"], 2.6);
+	assert.ok(harness.frontmatter["se-last-reviewed"]);
 });
 
 test("the timestamp handed to the calculation is a formatted UTC string", async () => {

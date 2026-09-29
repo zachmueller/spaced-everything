@@ -239,3 +239,85 @@ test("no active file produces a notice and nothing else", async () => {
 	assert.deepEqual(harness.notices, ["No active file to review."]);
 	assert.deepEqual(harness.processedQueue, []);
 });
+
+// The tests below check the note as it ends up, not how the plugin got it there.
+// `applyQueue` makes the queue flush land in `harness.frontmatter`, so these hold
+// whether the review is queued or written directly. A refactor that changes the
+// persistence mechanism should pass them untouched.
+
+test("after a review the note holds the new schedule and nothing else changed", async () => {
+	const before = { ...ONBOARDED, title: "Keep me", tags: ["a", "b"] };
+	const harness = createPluginHarness({ frontmatter: before, applyQueue: true });
+	harness.answerSuggester("Unfruitful");
+
+	await harness.plugin.logReviewOutcome();
+
+	const reviewed = harness.frontmatter["se-last-reviewed"];
+	assert.match(reviewed, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+	assert.notEqual(reviewed, ONBOARDED["se-last-reviewed"]);
+	assert.deepEqual(harness.frontmatter, {
+		...before,
+		"se-interval": 18.2,
+		"se-ease": 2.6,
+		"se-last-reviewed": reviewed,
+	});
+	assert.deepEqual(harness.notices, ["Interval updated from 7 to 18.2"]);
+});
+
+test("a review logs once, with the note's pre-review frontmatter and the new schedule", async () => {
+	const harness = createPluginHarness({
+		frontmatter: ONBOARDED,
+		settings: { logFilePath: "logs/reviews.jsonl" },
+		applyQueue: true,
+	});
+	// The real Logger serializes the frontmatter synchronously inside log(), so
+	// copy it at call time too: the object passed may be the live one.
+	const logs = [];
+	harness.plugin.logger = {
+		log: (action, file, frontmatter, ...rest) => {
+			logs.push([action, file, JSON.parse(JSON.stringify(frontmatter)), ...rest]);
+		},
+	};
+	harness.answerSuggester("Unfruitful");
+
+	await harness.plugin.logReviewOutcome();
+
+	assert.equal(logs.length, 1);
+	const [action, file, frontmatter, score, interval, ease] = logs[0];
+	assert.deepEqual([action, file, score, interval, ease], ["review", harness.file, 5, 18.2, 2.6]);
+	// The logged values must describe the note before this review.
+	assert.equal(frontmatter["se-interval"], 7);
+	assert.equal(frontmatter["se-ease"], 2.5);
+	assert.equal(frontmatter["se-last-reviewed"], ONBOARDED["se-last-reviewed"]);
+});
+
+test("an se-method repair and the review it precedes both land", async () => {
+	const harness = createPluginHarness({
+		frontmatter: { "se-interval": 7, "se-ease": 2.5, "se-method": "Deleted method" },
+		applyQueue: true,
+	});
+	harness.answerSuggester("Unfruitful");
+
+	await harness.plugin.logReviewOutcome();
+
+	assert.equal(harness.frontmatter["se-method"], "SuperMemo 2.0 (Simplified)");
+	assert.equal(harness.frontmatter["se-interval"], 18.2);
+	assert.equal(harness.frontmatter["se-ease"], 2.6);
+	assert.ok(harness.notices.includes("Interval updated from 7 to 18.2"));
+});
+
+test("the review's schedule wins over stale queued values for the same note", async () => {
+	// FrontmatterQueue merges per file with Object.assign and is only cleared by a
+	// flush, so updates from an earlier command that returned without flushing are
+	// still pending when a review starts. The review's own values are merged last
+	// and win. Anything that writes the review outside the queue and flushes after
+	// it would let the stale values overwrite the review instead.
+	const harness = createPluginHarness({ frontmatter: ONBOARDED, realQueue: true });
+	harness.plugin.queueFrontmatterUpdate(harness.file, { "se-interval": 99, "se-ease": 9 });
+	harness.answerSuggester("Unfruitful");
+
+	await harness.plugin.logReviewOutcome();
+
+	assert.equal(harness.frontmatter["se-interval"], 18.2);
+	assert.equal(harness.frontmatter["se-ease"], 2.6);
+});

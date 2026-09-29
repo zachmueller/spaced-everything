@@ -203,15 +203,35 @@ function defaultSettings(overrides = {}) {
  *   `harness.frontmatter`, which is how tests detect direct writes.
  * @param {Record<string, unknown>} [options.settings] - Merged over the defaults.
  * @param {string} [options.notePath]
+ * @param {boolean} [options.applyQueue]
+ *   Make each flush apply the updates queued since the previous one to
+ *   `harness.frontmatter`, as FrontmatterQueue does. `harness.frontmatter` then
+ *   shows the note as it ends up, however the plugin chose to write it. Tests of
+ *   the resulting state should use this rather than asserting on `queued`.
+ * @param {boolean} [options.realQueue]
+ *   Install the real FrontmatterQueue from src/frontmatterQueue.ts instead of the
+ *   recorder, for tests that depend on its per-file merge. `queued` and
+ *   `processedQueue` are still recorded. Implies `applyQueue`.
  * @returns {object} The harness: `plugin`, `file`, `frontmatter`, `notices`,
  *   `queued`, `logs`, `processedQueue`, and `answerSuggester()`.
  */
-function createPluginHarness({ frontmatter = {}, settings = {}, notePath = "Note.md" } = {}) {
+function createPluginHarness({
+	frontmatter = {},
+	settings = {},
+	notePath = "Note.md",
+	applyQueue = false,
+	realQueue = false,
+} = {}) {
 	const { obsidian, notices, SuggestModal } = createObsidianMock();
 	const { default: SpacedEverythingPlugin } = loadModule("src/main.ts", { obsidian });
 
 	const plugin = new SpacedEverythingPlugin();
-	const file = { path: notePath, basename: notePath.replace(/\.md$/, ""), extension: "md" };
+	// The real queue only writes to `instanceof TFile` files, so the note must be one.
+	const file = Object.assign(realQueue ? new obsidian.TFile() : {}, {
+		path: notePath,
+		basename: notePath.replace(/\.md$/, ""),
+		extension: "md",
+	});
 	const noteFrontmatter = { ...frontmatter };
 
 	/** Every `queueFrontmatterUpdate` call, in order. */
@@ -232,7 +252,10 @@ function createPluginHarness({ frontmatter = {}, settings = {}, notePath = "Note
 				await callback(noteFrontmatter);
 			},
 		},
-		vault: { getMarkdownFiles: () => [file] },
+		vault: {
+			getMarkdownFiles: () => [file],
+			getAbstractFileByPath: (p) => (p === file.path ? file : null),
+		},
 	};
 
 	// `suggester()` reads `this.app`, which is the global object under CJS.
@@ -251,6 +274,43 @@ function createPluginHarness({ frontmatter = {}, settings = {}, notePath = "Note
 			processedQueue.push(queued.map((entry) => entry.updates));
 		},
 	};
+
+	// Loading and saving plugin data, for loadSettings() and saveSettings().
+	plugin.savedData = [];
+	plugin.loadData = async () => null;
+	plugin.saveData = async (data) => {
+		plugin.savedData.push(JSON.parse(JSON.stringify(data)));
+	};
+
+	/** Index into `queued` of the first update not yet flushed. */
+	let flushed = 0;
+
+	if (realQueue) {
+		const { FrontmatterQueue } = loadModule("src/frontmatterQueue.ts", { obsidian });
+		const queue = new FrontmatterQueue(plugin.app);
+		plugin.frontmatterQueue = {
+			add: (target, updates) => {
+				queued.push({ file: target, updates });
+				queue.add(target, updates);
+			},
+			process: async () => {
+				processedQueue.push(queued.map((entry) => entry.updates));
+				flushed = queued.length;
+				await queue.process();
+			},
+		};
+	} else if (applyQueue) {
+		plugin.frontmatterQueue.process = async () => {
+			processedQueue.push(queued.map((entry) => entry.updates));
+			for (const { updates } of queued.slice(flushed)) {
+				for (const [key, value] of Object.entries(updates)) {
+					if (value === undefined) delete noteFrontmatter[key];
+					else noteFrontmatter[key] = value;
+				}
+			}
+			flushed = queued.length;
+		};
+	}
 
 	/** One entry per suggester opened: `{ promptText, items }`. */
 	const prompts = [];

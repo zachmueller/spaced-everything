@@ -226,3 +226,87 @@ test("the returned values are the ones queued", async () => {
 	assert.equal(result.newInterval, updates["se-interval"]);
 	assert.equal(result.newEaseFactor, updates["se-ease"]);
 });
+
+test("out-of-range numeric state is scheduled, not rejected", async () => {
+	// Recorded, not endorsed: a negative interval or ease is fed straight to
+	// SuperMemo, whose floors hide it (interval ≥ 1, ease ≥ 1.3). An interval large
+	// enough to overflow is written and announced as Infinity.
+	const cases = [
+		{ frontmatter: { "se-interval": -3, "se-ease": 2.5 }, expected: [1, 2.6], notice: "Interval updated from -3 to 1" },
+		{ frontmatter: { "se-interval": 7, "se-ease": -1 }, expected: [9.1, 1.3], notice: "Interval updated from 7 to 9.1" },
+		{ frontmatter: { "se-interval": 1e308, "se-ease": 2.5 }, expected: [Infinity, 2.6], notice: "Interval updated from 1e+308 to Infinity" },
+	];
+
+	for (const { frontmatter, expected, notice } of cases) {
+		const harness = createPluginHarness({ frontmatter, applyQueue: true });
+
+		const result = await harness.plugin.updateInterval(harness.file, {}, 5, TIMESTAMP, METHOD);
+		await harness.plugin.processFrontmatterQueue();
+
+		assert.deepEqual([result.newInterval, result.newEaseFactor], expected, JSON.stringify(frontmatter));
+		assert.deepEqual([harness.frontmatter["se-interval"], harness.frontmatter["se-ease"]], expected);
+		assert.deepEqual(harness.notices, [notice]);
+	}
+});
+
+test("a logging failure does not fail the review", async () => {
+	// logger.log() is called without awaiting it, so a rejected log write cannot
+	// undo or misreport a review. The real Logger also catches its own file errors.
+	const harness = createPluginHarness({
+		frontmatter: { "se-interval": 7, "se-ease": 2.5 },
+		settings: { logFilePath: "logs/reviews.jsonl" },
+		applyQueue: true,
+	});
+	harness.plugin.logger = {
+		log: () => {
+			const failed = Promise.reject(new Error("log volume unavailable"));
+			failed.catch(() => {}); // handled here, so the runner sees no unhandled rejection
+			return failed;
+		},
+	};
+
+	const result = await harness.plugin.updateInterval(harness.file, {}, 5, TIMESTAMP, METHOD);
+	await harness.plugin.processFrontmatterQueue();
+
+	assert.deepEqual(result, { newInterval: 18.2, newEaseFactor: 2.6 });
+	assert.equal(harness.frontmatter["se-interval"], 18.2);
+	assert.equal(harness.frontmatter["se-ease"], 2.6);
+	assert.deepEqual(harness.notices, ["Interval updated from 7 to 18.2"]);
+});
+
+test("a failing frontmatter read rejects before anything is queued, announced or logged", async () => {
+	const harness = createPluginHarness({
+		frontmatter: { "se-interval": 7, "se-ease": 2.5 },
+		settings: { logFilePath: "logs/reviews.jsonl" },
+	});
+	harness.plugin.app.fileManager.processFrontMatter = async () => {
+		throw new Error("file is locked");
+	};
+
+	await assert.rejects(
+		harness.plugin.updateInterval(harness.file, {}, 5, TIMESTAMP, METHOD),
+		/file is locked/,
+	);
+	assert.deepEqual(harness.queued, []);
+	assert.deepEqual(harness.notices, []);
+	assert.deepEqual(harness.logs, []);
+});
+
+test("through the command, that failure escapes logReviewOutcome() and skips the flush", async () => {
+	// Recorded, not endorsed: the user gets no notice at all (the command's promise
+	// rejects), and an se-method repair queued before the failure stays pending.
+	const harness = createPluginHarness({
+		frontmatter: { "se-interval": 7, "se-ease": 2.5, "se-method": "Deleted method" },
+	});
+	harness.plugin.app.fileManager.processFrontMatter = async () => {
+		throw new Error("file is locked");
+	};
+	harness.answerSuggester("Unfruitful");
+
+	await assert.rejects(harness.plugin.logReviewOutcome(), /file is locked/);
+	assert.deepEqual(harness.queued, [
+		{ file: harness.file, updates: { "se-method": "SuperMemo 2.0 (Simplified)" } },
+	]);
+	assert.deepEqual(harness.processedQueue, []);
+	assert.ok(!harness.notices.some((n) => n.startsWith("Interval updated")));
+});

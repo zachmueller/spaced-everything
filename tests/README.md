@@ -46,6 +46,24 @@ the code under test reaches for:
 An unanswered suggester throws instead of hanging, so an unexpected prompt fails
 loudly rather than timing out.
 
+Two opt-in options control what a queue flush does:
+
+- `applyQueue: true` — each `processFrontmatterQueue()` applies the updates queued
+  since the last flush to `frontmatter`. `frontmatter` then shows the note as it
+  ends up, whether the plugin queued its updates or wrote them directly. Tests of
+  the *resulting note* should use this and assert on `frontmatter`, not `queued`,
+  so a change of persistence mechanism doesn't force them to be rewritten.
+- `realQueue: true` — installs the real `FrontmatterQueue` (per-file merge, cleared
+  on flush), for tests that depend on its merge order. Implies `applyQueue`.
+
+`plugin.loadData` / `plugin.saveData` are stubbed (`saveData` records into
+`plugin.savedData`), so `loadSettings()` can be driven with a saved `data.json`.
+
+The settings tab has its own harness, `tests/helpers/settings-harness.cjs`. Its
+`Setting` stand-in records each rendered setting's name, text boxes, dropdown and
+container, so `find("Spacing algorithm").dropdown.change("Custom")` fires the
+real handler. It also counts `saveSettings()` calls and collects notices.
+
 Two things the harness deliberately mirrors rather than fixes:
 
 - **Non-strict CJS.** `suggester()` in `src/suggester.ts` reads `this.app` from an
@@ -66,6 +84,13 @@ behavior that looks wrong:
 - `se-interval: soon` produces `NaN` and writes it to the note.
 - Review scores are not validated or clamped to 0–5.
 - A cancelled review drops an `se-method` repair that was already queued.
+- Every `spacingAlgorithm` value, including `Custom` with no script, schedules with
+  SuperMemo; `loadSettings()` doesn't migrate saved methods.
+- A negative interval or ease is scheduled through SuperMemo's floors, and an
+  overflowing interval is written as `Infinity`.
+- A failed frontmatter read escapes `logReviewOutcome()` with no notice.
+- Clearing a review score saves `NaN`, `'2abc'` saves `2`, and switching a method
+  to SuperMemo doesn't check its scores.
 
 Each of those is marked in a comment as recorded-not-endorsed. The point is to make
 refactors checkable: if a change is meant to preserve behavior, every assertion
@@ -81,4 +106,13 @@ about why is the record of it.
 | --- | --- |
 | `scheduling-baseline.test.cjs` | The SM-2 arithmetic: 96 golden vectors plus rounding order, the 1.3 ease floor, the 1-day interval floor, and out-of-range scores |
 | `update-interval-baseline.test.cjs` | `updateInterval()`'s contract: where prior state is read, default resolution, queue-don't-write, the notice text, and log ordering |
-| `review-flow-baseline.test.cjs` | `logReviewOutcome()`: the prompt, score mapping, Remove, cancel, onboarding, and whether the queue gets flushed |
+| `review-flow-baseline.test.cjs` | `logReviewOutcome()`: the prompt, score mapping, Remove, cancel, onboarding, and whether the queue gets flushed; plus the note's end state after a review, including an `se-method` repair and stale queued values |
+| `algorithm-dispatch-baseline.test.cjs` | What `spacingAlgorithm` does to a review (nothing: always SuperMemo), and that `loadSettings()` keeps saved values as saved |
+| `settings-baseline.test.cjs` | The settings tab: review-score parsing and its 0–5 range, the algorithm dropdown, and which fields it shows |
+
+`update-interval-baseline.test.cjs` also pins the failure edges: out-of-range
+numbers, a rejected log write, and a failed frontmatter read.
+
+The end-state tests (anything using `applyQueue`/`realQueue`) are written so a
+correct change to *how* a review is persisted passes them unchanged. If one of
+those fails, the note now ends up different, and that is the thing to explain.

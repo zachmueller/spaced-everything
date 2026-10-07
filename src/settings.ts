@@ -724,8 +724,8 @@ export class SpacedEverythingSettingTab extends PluginSettingTab {
 			);
 
 		customScriptSetting.descEl.createEl('a', {
-			text: ' Function signature and examples',
-			href: 'https://github.com/zachmueller/spaced-everything/blob/main/docs/Custom-algorithms.md#function-contract',
+			text: ' Documentation and examples',
+			href: 'https://github.com/zachmueller/spaced-everything#readme',
 		});
 
 		const defaultEaseFactorSettingContainer = generalSettingsDiv.createDiv();

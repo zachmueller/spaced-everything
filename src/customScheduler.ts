@@ -26,11 +26,14 @@ export function scriptPath(value: string): string {
  */
 export async function loadScheduler(
 	method: Pick<SpacingMethod, 'spacingAlgorithm' | 'customScriptFileName'>,
-	read: (path: string) => Promise<string>
+	read: (path: string) => Promise<string>,
+	onFallback: () => void = () => undefined
 ): Promise<Scheduler> {
 	if (method.spacingAlgorithm === 'SuperMemo2.0') return superMemo;
-	if (method.spacingAlgorithm !== 'Custom') {
-		throw new Error(`Unknown spacing algorithm "${method.spacingAlgorithm}". Choose SuperMemo 2.0 or Custom script in settings.`);
+	// Older versions offered Custom before scripts were implemented and always used SM-2.
+	if (method.spacingAlgorithm !== 'Custom' || !method.customScriptFileName?.trim()) {
+		onFallback();
+		return superMemo;
 	}
 	const path = scriptPath(method.customScriptFileName || '');
 	try {

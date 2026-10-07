@@ -11,6 +11,7 @@ function setup(source, writeError = false) {
   const plugin = new Plugin();
   const initial = { 'se-interval': 7, 'se-ease': 2.5, 'se-last-reviewed': 'old', unrelated: 'keep' };
   let metadata = { ...initial }, writes = 0;
+  plugin.frontmatterQueue = { discardFields: () => {} };
   plugin.settings = { logFilePath: 'reviews.jsonl' };
   plugin.logger = { log: (...args) => { assert.equal(writes, 1); logs.push(args); } };
   plugin.app = {

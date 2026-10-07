@@ -1,4 +1,16 @@
-/** Regression coverage for scheduling defaults, direct persistence, and logging. */
+/**
+ * The call contract of `updateInterval()` in src/main.ts, as shipped today.
+ *
+ * Companion to scheduling-baseline.test.cjs: that file pins the arithmetic, this
+ * one pins everything around it — where the prior scheduling state is read from,
+ * how missing values are resolved, what gets queued rather than written, what the
+ * user is told, and when the log line is emitted.
+ *
+ * Both files exist to make behavior-preserving refactors of this method
+ * checkable. Anything asserted here is current behavior, including the parts that
+ * look like bugs; those are called out in comments rather than fixed, because a
+ * test that quietly encodes a wish is worse than no test.
+ */
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -6,6 +18,7 @@ const assert = require("node:assert/strict");
 const { createPluginHarness } = require("./helpers/harness.cjs");
 
 /** A spacing method whose defaults are distinguishable from the hardcoded ones. */
+// Behavior change (#36): pass an explicit method to select the scheduler.
 const METHOD = { name: "Test method", spacingAlgorithm: "SuperMemo2.0", defaultInterval: 3, defaultEaseFactor: 2 };
 
 const TIMESTAMP = "2026-01-01T12:00:00Z";
@@ -84,6 +97,7 @@ test("numeric strings in frontmatter are coerced", async () => {
 	);
 });
 
+// Behavior change (#36): Reject invalid state instead of persisting NaN so a bad note cannot corrupt its schedule.
 test("non-numeric frontmatter is rejected without changing the note or reporting success", async () => {
 	const initial = { "se-interval": "soon", "se-ease": "easy" };
 	const harness = createPluginHarness({ frontmatter: initial });
@@ -94,6 +108,7 @@ test("non-numeric frontmatter is rejected without changing the note or reporting
 	assert.deepEqual(harness.logs, []);
 });
 
+// Behavior change (#36): Persist and validate in one transaction; report success only after the write resolves.
 test("the new schedule is persisted directly and only three keys are touched", async () => {
 	const initial = { "se-interval": 7, "se-ease": 2.5, "se-method": "Test method", title: "keep" };
 	const harness = createPluginHarness({ frontmatter: initial });
@@ -154,6 +169,7 @@ test("the review is logged only when a log file is configured", async () => {
 	assert.deepEqual(loggedFrontmatter, { "se-interval": 7, "se-ease": 2.5 });
 });
 
+// Behavior change (#36): Log only after persistence so failed writes cannot produce successful review entries.
 test("the log line is emitted after persistence and before the success notice", async () => {
 	const harness = createPluginHarness({
 		frontmatter: { "se-interval": 7, "se-ease": 2.5 },
@@ -187,31 +203,26 @@ test("the returned values are the ones persisted", async () => {
 	assert.equal(result.newEaseFactor, updates["se-ease"]);
 });
 
-test("out-of-range numeric state is scheduled, not rejected", async () => {
-	// Recorded, not endorsed: a negative interval or ease is fed straight to
-	// SuperMemo, whose floors hide it (interval ≥ 1, ease ≥ 1.3). An interval large
-	// enough to overflow is written and announced as Infinity.
-	const cases = [
-		{ frontmatter: { "se-interval": -3, "se-ease": 2.5 }, expected: [1, 2.6], notice: "Interval updated from -3 to 1" },
-		{ frontmatter: { "se-interval": 7, "se-ease": -1 }, expected: [9.1, 1.3], notice: "Interval updated from 7 to 9.1" },
-		{ frontmatter: { "se-interval": 1e308, "se-ease": 2.5 }, expected: [Infinity, 2.6], notice: "Interval updated from 1e+308 to Infinity" },
-	];
-
-	for (const { frontmatter, expected, notice } of cases) {
-		const harness = createPluginHarness({ frontmatter, applyQueue: true });
-
-		const result = await harness.plugin.updateInterval(harness.file, {}, 5, TIMESTAMP, METHOD);
-		await harness.plugin.processFrontmatterQueue();
-
-		assert.deepEqual([result.newInterval, result.newEaseFactor], expected, JSON.stringify(frontmatter));
-		assert.deepEqual([harness.frontmatter["se-interval"], harness.frontmatter["se-ease"]], expected);
-		assert.deepEqual(harness.notices, [notice]);
+test("invalid numeric state and overflow are rejected without saving", async () => {
+	// Behavior change (#36): reject negative/non-finite inputs and overflow rather than saving a misleading schedule.
+	for (const frontmatter of [
+		{ "se-interval": -3, "se-ease": 2.5 },
+		{ "se-interval": 7, "se-ease": -1 },
+		{ "se-interval": 1e308, "se-ease": 2.5 },
+		{ "se-interval": Infinity, "se-ease": 2.5 },
+	]) {
+		const harness = createPluginHarness({ frontmatter });
+		await assert.rejects(harness.plugin.updateInterval(harness.file, {}, 5, TIMESTAMP, METHOD), /positive finite/);
+		assert.deepEqual(harness.frontmatter, frontmatter);
+		assert.deepEqual(harness.queued, []);
+		assert.deepEqual(harness.notices, []);
+		assert.deepEqual(harness.logs, []);
 	}
 });
 
 test("a logging failure does not fail the review", async () => {
-	// logger.log() is called without awaiting it, so a rejected log write cannot
-	// undo or misreport a review. The real Logger also catches its own file errors.
+	// Logging errors are isolated from persistence and the success notice.
+	// The real Logger also catches its own file errors.
 	const harness = createPluginHarness({
 		frontmatter: { "se-interval": 7, "se-ease": 2.5 },
 		settings: { logFilePath: "logs/reviews.jsonl" },
@@ -252,9 +263,8 @@ test("a failing frontmatter read rejects before anything is queued, announced or
 	assert.deepEqual(harness.logs, []);
 });
 
-test("through the command, that failure escapes logReviewOutcome() and skips the flush", async () => {
-	// Recorded, not endorsed: the user gets no notice at all (the command's promise
-	// rejects), and an se-method repair queued before the failure stays pending.
+test("through the command, a save failure shows a notice and skips the flush", async () => {
+	// Behavior change (#36): catch save errors to give actionable feedback; leave the queue pending on failure.
 	const harness = createPluginHarness({
 		frontmatter: { "se-interval": 7, "se-ease": 2.5, "se-method": "Deleted method" },
 	});
@@ -263,7 +273,8 @@ test("through the command, that failure escapes logReviewOutcome() and skips the
 	};
 	harness.answerSuggester("Unfruitful");
 
-	await assert.rejects(harness.plugin.logReviewOutcome(), /file is locked/);
+	await harness.plugin.logReviewOutcome();
+	assert.ok(harness.notices.includes("Review could not be saved: file is locked"));
 	assert.deepEqual(harness.queued, [
 		{ file: harness.file, updates: { "se-method": "SuperMemo 2.0 (Simplified)" } },
 	]);

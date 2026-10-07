@@ -6,10 +6,15 @@ const method = { spacingAlgorithm: 'Custom', customScriptFileName: 'scripts/revi
 const input = { interval: 7, easeFactor: 2.5, reviewScore: 5 };
 const run = async source => calculateSchedule(await loadScheduler(method, async () => source), input);
 
-test('dispatches built-in and rejects unknown algorithm', async () => {
+test('dispatches built-in and falls back for legacy algorithms', async () => {
   const scheduler = await loadScheduler({ spacingAlgorithm: 'SuperMemo2.0' }, () => assert.fail('must not read a script'));
   assert.deepEqual(calculateSchedule(scheduler, input), { interval: 18.2, easeFactor: 2.6 });
-  await assert.rejects(loadScheduler({ spacingAlgorithm: 'typo' }, () => {}), /Unknown spacing algorithm/);
+  for (const legacy of [{ spacingAlgorithm: 'typo' }, {}, { spacingAlgorithm: 'Custom', customScriptFileName: '' }, { spacingAlgorithm: 'Custom', customScriptFileName: '  ' }]) {
+    let warned = false;
+    const fallback = await loadScheduler(legacy, () => assert.fail('must not read a script'), () => { warned = true; });
+    assert.deepEqual(calculateSchedule(fallback, input), { interval: 18.2, easeFactor: 2.6 });
+    assert.equal(warned, true);
+  }
 });
 
 test('loads each review, passes frozen numeric state, and preserves omitted ease', async () => {
@@ -33,7 +38,7 @@ test('accepts fractional intervals, custom scores, and explicit ease', async () 
 });
 
 test('rejects invalid paths before reading, and reports missing files', async () => {
-  for (const customScriptFileName of ['', '/x.js', '../x.js', 'a/../x.js', 'a//x.js', './x.js', 'C:\\x.js', 'https://x.js', 'x.ts', 'x\n.js']) {
+  for (const customScriptFileName of ['/x.js', '../x.js', 'a/../x.js', 'a//x.js', './x.js', 'C:\\x.js', 'https://x.js', 'x.ts', 'x\n.js']) {
     await assert.rejects(loadScheduler({ ...method, customScriptFileName }, () => assert.fail('invalid path read')), /vault-relative/);
   }
   await assert.rejects(loadScheduler(method, async () => { throw new Error('File not found'); }), /scripts\/review.js.*File not found/);

@@ -81,18 +81,28 @@ implementation as it shipped, not derived from a specification, and that include
 behavior that looks wrong:
 
 - `se-interval: 0` falls back to the default, because the code uses `||`.
-- `se-interval: soon` produces `NaN` and writes it to the note.
-- Review scores are not validated or clamped to 0–5.
+- Finite review scores already stored outside 0–5 are not clamped by SuperMemo.
+  The settings UI requires 0–5 for SuperMemo; Custom accepts any finite score.
 - A cancelled review drops an `se-method` repair that was already queued.
-- Every `spacingAlgorithm` value, including `Custom` with no script, schedules with
-  SuperMemo; `loadSettings()` doesn't migrate saved methods.
-- A negative interval or ease is scheduled through SuperMemo's floors, and an
-  overflowing interval is written as `Infinity`.
-- A failed frontmatter read escapes `logReviewOutcome()` with no notice.
-- Clearing a review score saves `NaN`, `'2abc'` saves `2`, and switching a method
-  to SuperMemo doesn't check its scores.
+- `loadSettings()` preserves saved methods without migrating their algorithm values.
 
-Each of those is marked in a comment as recorded-not-endorsed. The point is to make
+Intentional changes in #36 are marked with `// Behavior change (#36): ...` in
+these tests:
+
+- Non-numeric, negative, or non-finite resolved interval/ease, non-finite scores,
+  and invalid scheduler results (including zero and overflow) are rejected before
+  saving. Stored falsy values still use the defaults described above.
+- Reviews save directly against fresh frontmatter; a successful save removes
+  superseded scheduling fields from the queue while retaining unrelated edits.
+  Save failures show a notice instead of escaping the review command.
+- Logging happens after persistence; logging errors cannot fail a saved review.
+- Legacy Custom methods without a script and unknown/missing algorithm values
+  retain SuperMemo scheduling, with one fallback notice per plugin session.
+- Score entry rejects empty strings and partially numeric text. Custom scores
+  may be outside 0–5, and switching to SuperMemo requires compatible scores.
+- The custom script box is enabled now that scripts are implemented.
+
+Each remaining recorded behavior is marked in a comment as recorded-not-endorsed. The point is to make
 refactors checkable: if a change is meant to preserve behavior, every assertion
 here must still pass untouched. If an assertion has to change, the change is a
 behavior change — which may be the right call, but it should be a decision rather
@@ -105,10 +115,10 @@ about why is the record of it.
 | File | Pins |
 | --- | --- |
 | `scheduling-baseline.test.cjs` | The SM-2 arithmetic: 96 golden vectors plus rounding order, the 1.3 ease floor, the 1-day interval floor, and out-of-range scores |
-| `update-interval-baseline.test.cjs` | `updateInterval()`'s contract: where prior state is read, default resolution, queue-don't-write, the notice text, and log ordering |
+| `update-interval-baseline.test.cjs` | `updateInterval()`'s contract: where prior state is read, default resolution, direct persistence, input validation, the notice text, and log ordering |
 | `review-flow-baseline.test.cjs` | `logReviewOutcome()`: the prompt, score mapping, Remove, cancel, onboarding, and whether the queue gets flushed; plus the note's end state after a review, including an `se-method` repair and stale queued values |
-| `algorithm-dispatch-baseline.test.cjs` | What `spacingAlgorithm` does to a review (nothing: always SuperMemo), and that `loadSettings()` keeps saved values as saved |
-| `settings-baseline.test.cjs` | The settings tab: review-score parsing and its 0–5 range, the algorithm dropdown, and which fields it shows |
+| `algorithm-dispatch-baseline.test.cjs` | Legacy algorithm fallback and its one-time notice; `loadSettings()` keeps saved values as saved |
+| `settings-baseline.test.cjs` | The settings tab: review-score parsing and algorithm-specific ranges, the algorithm dropdown, and which fields it shows |
 
 `update-interval-baseline.test.cjs` also pins the failure edges: out-of-range
 numbers, a rejected log write, and a failed frontmatter read.

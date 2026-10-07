@@ -40,7 +40,9 @@ Only this export format is supported. ES module `export default`, imports, `requ
 
 ## Errors and trust
 
-A missing script, syntax error, wrong export, thrown exception, or invalid result produces an error notice. The plugin does not fall back to SuperMemo and does not update the review interval, ease, or timestamp on calculation failure. It validates the whole result before assigning review fields, and only logs a successful review or shows the success notice after the frontmatter write resolves. A failed review is not left in the shared metadata queue for a later command to save.
+For compatibility with older versions, a Custom method with an empty script path or a method with an unknown/missing algorithm uses SuperMemo, with a notice once per plugin session.
+
+For a configured script path, a missing file, syntax error, wrong export, thrown exception, or invalid result produces an error notice. The plugin does not fall back to SuperMemo and does not update the review interval, ease, or timestamp on calculation failure. It validates the whole result before assigning review fields, and only logs a successful review or shows the success notice after the frontmatter write resolves. A failed review is not left in the shared metadata queue for a later command to save.
 
 **Use only scripts you wrote or trust.** Scripts execute with Obsidian's host privileges. Freezing the input is not a sandbox and cannot prevent a script from accessing globals or causing side effects. A synchronous infinite loop can freeze the application; there is no execution timeout. These failure guarantees cover the plugin's own metadata updates, not side effects caused by script code.
 

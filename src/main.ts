@@ -104,6 +104,7 @@ export default class SpacedEverythingPlugin extends Plugin {
 	settings: SpacedEverythingPluginSettings;
 	logger: Logger;
 	private frontmatterQueue: FrontmatterQueue;
+	private schedulerFallbackNotified = false;
 
 	async onload() {
 		await this.loadSettings();
@@ -1157,7 +1158,12 @@ export default class SpacedEverythingPlugin extends Plugin {
 	 * @returns Persisted interval in days and ease factor
 	 */
 	async updateInterval(file: TFile, frontmatter: any, reviewScore: number, nowFormatted: string, activeSpacingMethod: SpacingMethod): Promise<{ newInterval: number; newEaseFactor: number; }> {
-		const scheduler = await loadScheduler(activeSpacingMethod, path => this.app.vault.adapter.read(path));
+		const scheduler = await loadScheduler(activeSpacingMethod, path => this.app.vault.adapter.read(path), () => {
+			if (!this.schedulerFallbackNotified) {
+				new Notice('Using SuperMemo 2.0 for a legacy spacing method with no custom script or an unknown algorithm. Check spacing method settings.');
+				this.schedulerFallbackNotified = true;
+			}
+		});
 		let prevInterval = 1;
 		let newInterval = 0;
 		let newEaseFactor = 0;
@@ -1177,8 +1183,14 @@ export default class SpacedEverythingPlugin extends Plugin {
 			});
 		});
 
+		// The saved review supersedes older queued scheduling values, but not other metadata.
+		this.frontmatterQueue.discardFields(file, ['se-interval', 'se-ease', 'se-last-reviewed']);
 		if (this.settings.logFilePath) {
-			await this.logger.log('review', file, previousFrontmatter, reviewScore, newInterval, newEaseFactor);
+			try {
+				await this.logger.log('review', file, previousFrontmatter, reviewScore, newInterval, newEaseFactor);
+			} catch (error) {
+				console.error('Spaced Everything: review saved, but logging failed', error);
+			}
 		}
 		new Notice(`Interval updated from ${prevInterval} to ${newInterval}`);
 		return { newInterval, newEaseFactor };

@@ -107,6 +107,14 @@ export class FrontmatterQueue {
         Object.assign(fileUpdates, updates);
     }
 
+    /** Remove fields superseded by a successful direct write, preserving other pending edits. */
+    discardFields(file: TFile, fields: readonly string[]) {
+        const updates = this.queue.get(file.path);
+        if (!updates) return;
+        for (const field of fields) delete updates[field];
+        if (Object.keys(updates).length === 0) this.queue.delete(file.path);
+    }
+
     /**
      * Apply all queued updates atomically
      * 

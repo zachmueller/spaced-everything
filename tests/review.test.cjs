@@ -24,6 +24,7 @@ test('review integration preserves defaults, frontmatter fields, logging and not
     const initial = { ...metadata };
     const logs = [];
     let persisted = false;
+    plugin.frontmatterQueue = { discardFields: () => {} };
     plugin.settings = { logFilePath: 'reviews.jsonl' };
     plugin.logger = { log: (...args) => { assert.ok(persisted); logs.push(args); } };
     plugin.app = { fileManager: { processFrontMatter: async (target, callback) => {

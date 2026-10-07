@@ -248,6 +248,7 @@ test("scores outside 0-5 are neither rejected nor clamped", async () => {
 	assert.deepEqual(await review(7, 2.5, -10), { newInterval: 1, newEaseFactor: 1.3 });
 });
 
+// Behavior change (#36): Reject non-finite scores before persistence to avoid corrupting review metadata.
 test("a non-numeric score is rejected before persistence", async () => {
 	await assert.rejects(review(7, 2.5, Number.NaN), /finite review score/);
 });

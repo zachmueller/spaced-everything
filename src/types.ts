@@ -66,8 +66,8 @@ export interface Context {
  * represents a level of recall quality and has an associated score that
  * affects how the SuperMemo 2.0 algorithm calculates the next interval.
  * 
- * Standard SuperMemo 2.0 uses scores 0-5, but this can be customized
- * to provide more or fewer options based on user preference.
+ * SuperMemo 2.0 uses scores 0-5. Custom scripts may interpret any finite
+ * numeric score; labels and the number of options can be customized.
  */
 export interface ReviewOption {
 	/**
@@ -108,7 +108,7 @@ export interface ReviewOption {
  * schedules for different types of notes.
  * 
  * This interface is designed to be extensible for future algorithms beyond
- * SuperMemo 2.0, though currently only SuperMemo 2.0 is implemented.
+ * SuperMemo 2.0, with Custom scripts providing an alternative scheduling policy.
  */
 export interface SpacingMethod {
 	/**
@@ -123,21 +123,15 @@ export interface SpacingMethod {
 	/**
 	 * Algorithm identifier
 	 * 
-	 * Specifies which spacing algorithm to use. Currently only
-	 * 'SuperMemo 2.0' is supported, but the interface is designed
-	 * to support future algorithms like Anki's FSRS.
-	 * 
-	 * Example: 'SuperMemo 2.0'
+	 * Selects 'SuperMemo2.0' or 'Custom'. Unknown identifiers are rejected
+	 * at review time rather than silently falling back to another algorithm.
 	 */
 	spacingAlgorithm: string;
 
 	/**
-	 * Filename of custom algorithm script
-	 * 
-	 * Reserved for future extensibility. Would allow users to implement
-	 * custom spacing algorithms via JavaScript files.
-	 * 
-	 * Currently unused but included for future-proofing.
+	 * Vault-relative .js path used when spacingAlgorithm is Custom.
+	 * The trusted script exports a synchronous function via module.exports and
+	 * is reloaded on each review. It runs with host privileges, without a sandbox.
 	 */
 	customScriptFileName: string;
 
@@ -156,8 +150,8 @@ export interface SpacingMethod {
 	 * Initial interval in days for new notes
 	 * 
 	 * When a note is first onboarded to spaced repetition, this interval
-	 * is used for the first review. After the first review, the SuperMemo
-	 * 2.0 algorithm takes over and calculates subsequent intervals.
+	 * is used for the first review. The selected algorithm calculates subsequent
+	 * intervals from the review feedback.
 	 * 
 	 * Default: 1 (review again tomorrow)
 	 */

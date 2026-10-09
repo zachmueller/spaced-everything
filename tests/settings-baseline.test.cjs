@@ -51,29 +51,25 @@ test("a review score outside 0-5, or not a number, is refused with a notice", as
 	}
 });
 
-test("an empty score box saves NaN, and a numeric prefix is saved as its number", async () => {
-	// Recorded, not endorsed. The check is `value === '' || parseFloat in range`,
-	// so clearing the box stores parseFloat('') = NaN, which JSON saves as null
-	// (logReviewOutcome then refuses that option as unscored). parseFloat also
-	// reads a leading number and drops the rest, so '2abc' saves 2.
-	const empty = renderScore(defaultSpacingMethod());
-	await empty.score.change("");
-	assert.ok(Number.isNaN(empty.option.score));
-	assert.equal(empty.harness.saves(), 1);
-
-	const prefix = renderScore(defaultSpacingMethod());
-	await prefix.score.change("2abc");
-	assert.equal(prefix.option.score, 2);
-	assert.equal(prefix.harness.saves(), 1);
+test("empty and partially numeric scores are refused", async () => {
+	// Behavior change (#36): Number parsing requires a complete finite value, preventing accidental NaN or truncated scores.
+	for (const typed of ["", " ", "2abc"]) {
+		const { harness, option, score } = renderScore(defaultSpacingMethod());
+		const before = option.score;
+		await score.change(typed);
+		assert.equal(option.score, before);
+		assert.equal(harness.saves(), 0);
+		assert.deepEqual(harness.notices, [RANGE_NOTICE]);
+	}
 });
 
-test("the 0-5 range applies whatever the method's algorithm is", async () => {
+test("Custom methods accept finite scores outside 0-5", async () => {
+	// Behavior change (#36): custom scripts interpret scores using their own policy.
 	const { harness, option, score } = renderScore(defaultSpacingMethod({ spacingAlgorithm: "Custom" }));
-
 	await score.change("25");
-
-	assert.equal(option.score, 1, "the Fruitful default is kept");
-	assert.deepEqual(harness.notices, [RANGE_NOTICE]);
+	assert.equal(option.score, 25);
+	assert.equal(harness.saves(), 1);
+	assert.deepEqual(harness.notices, []);
 });
 
 /** Render a whole spacing method and return the controls these tests use. */
@@ -93,12 +89,13 @@ function renderMethod(method) {
 	};
 }
 
-test("the dropdown offers SuperMemo and Custom, and the script box is disabled", () => {
+test("the dropdown offers SuperMemo and Custom, and the script box is enabled", () => {
 	const { dropdown, scriptBox, visibility } = renderMethod(defaultSpacingMethod());
 
 	assert.deepEqual(dropdown.options, { "SuperMemo2.0": "SuperMemo 2.0", Custom: "Custom script" });
 	assert.equal(dropdown.value, "SuperMemo2.0");
-	assert.equal(scriptBox.disabled, true, "custom scripts are not implemented");
+	// Behavior change (#36): scripts are implemented, so users can enter a path.
+	assert.equal(scriptBox.disabled, false);
 	assert.deepEqual(visibility(), { customScript: "none", defaultEase: "block" });
 });
 
@@ -117,14 +114,19 @@ test("switching algorithms saves the choice and swaps which fields are shown", a
 	assert.equal(method.spacingAlgorithm, "Custom");
 	assert.deepEqual(visibility(), { customScript: "block", defaultEase: "none" });
 
-	// Recorded, not endorsed: switching to SuperMemo checks nothing, so scores a
-	// hand-edited data.json put out of range are kept and fed to SuperMemo.
+	// Behavior change (#36): block switching until scores meet SuperMemo's range, avoiding incompatible saved settings.
 	method.reviewOptions[0].score = 25;
 	await dropdown.change("SuperMemo2.0");
-	assert.equal(method.spacingAlgorithm, "SuperMemo2.0");
+	assert.equal(method.spacingAlgorithm, "Custom");
+	assert.equal(dropdown.value, "Custom");
 	assert.equal(method.reviewOptions[0].score, 25);
-	assert.deepEqual(visibility(), { customScript: "none", defaultEase: "block" });
+	assert.deepEqual(visibility(), { customScript: "block", defaultEase: "none" });
+	assert.equal(harness.saves(), 1);
+	assert.deepEqual(harness.notices, ["Correct all review scores to numbers from 0 to 5 before switching to SuperMemo 2.0."]);
 
+	method.reviewOptions[0].score = 5;
+	await dropdown.change("SuperMemo2.0");
+	assert.equal(method.spacingAlgorithm, "SuperMemo2.0");
+	assert.deepEqual(visibility(), { customScript: "none", defaultEase: "block" });
 	assert.equal(harness.saves(), 2);
-	assert.deepEqual(harness.notices, []);
 });

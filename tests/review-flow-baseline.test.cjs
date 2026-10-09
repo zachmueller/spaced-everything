@@ -78,20 +78,16 @@ test("the chosen option's score is what reaches the calculation", async () => {
 	}
 });
 
-test("a review flushes the frontmatter queue exactly once, after queueing", async () => {
+// Behavior change (#36): Save the validated schedule directly so failed writes cannot leave queued review changes.
+test("a review persists its schedule directly and flushes the remaining queue once", async () => {
 	const harness = createPluginHarness({ frontmatter: ONBOARDED });
 	harness.answerSuggester("Unfruitful");
-
 	await harness.plugin.logReviewOutcome();
-
-	assert.equal(harness.processedQueue.length, 1, "the queue must be flushed once");
-	assert.deepEqual(harness.processedQueue[0], [
-		{
-			"se-interval": 18.2,
-			"se-ease": 2.6,
-			"se-last-reviewed": harness.queued[0].updates["se-last-reviewed"],
-		},
-	]);
+	assert.deepEqual(harness.processedQueue, [[]]);
+	assert.deepEqual(harness.queued, []);
+	assert.equal(harness.frontmatter["se-interval"], 18.2);
+	assert.equal(harness.frontmatter["se-ease"], 2.6);
+	assert.ok(harness.frontmatter["se-last-reviewed"]);
 });
 
 test("the timestamp handed to the calculation is a formatted UTC string", async () => {
@@ -309,15 +305,44 @@ test("an se-method repair and the review it precedes both land", async () => {
 test("the review's schedule wins over stale queued values for the same note", async () => {
 	// FrontmatterQueue merges per file with Object.assign and is only cleared by a
 	// flush, so updates from an earlier command that returned without flushing are
-	// still pending when a review starts. The review's own values are merged last
-	// and win. Anything that writes the review outside the queue and flushes after
-	// it would let the stale values overwrite the review instead.
+	// still pending when a review starts. The saved review must supersede those
+	// scheduling values while preserving unrelated queued edits.
 	const harness = createPluginHarness({ frontmatter: ONBOARDED, realQueue: true });
-	harness.plugin.queueFrontmatterUpdate(harness.file, { "se-interval": 99, "se-ease": 9 });
+	harness.plugin.queueFrontmatterUpdate(harness.file, { "se-interval": 99, "se-ease": 9, "se-last-reviewed": "stale", title: "pending edit" });
 	harness.answerSuggester("Unfruitful");
 
 	await harness.plugin.logReviewOutcome();
 
 	assert.equal(harness.frontmatter["se-interval"], 18.2);
 	assert.equal(harness.frontmatter["se-ease"], 2.6);
+	assert.notEqual(harness.frontmatter["se-last-reviewed"], "stale");
+	assert.equal(harness.frontmatter.title, "pending edit");
+});
+
+test("logging failure still flushes the method repair after a saved review", async () => {
+	const harness = createPluginHarness({
+		frontmatter: { ...ONBOARDED, "se-method": "Deleted method" },
+		settings: { logFilePath: "reviews.jsonl" }, realQueue: true,
+	});
+	harness.plugin.logger = { log: async () => { throw new Error("log unavailable"); } };
+	harness.answerSuggester("Unfruitful");
+	await harness.plugin.logReviewOutcome();
+	assert.equal(harness.frontmatter["se-method"], "SuperMemo 2.0 (Simplified)");
+	assert.equal(harness.frontmatter["se-interval"], 18.2);
+	assert.ok(harness.notices.includes("Interval updated from 7 to 18.2"));
+	assert.ok(!harness.notices.some(n => n.startsWith("Review could not be saved")));
+});
+
+test("a failed review preserves pending queue edits", async () => {
+	const harness = createPluginHarness({ frontmatter: ONBOARDED, realQueue: true });
+	await harness.plugin.queueFrontmatterUpdate(harness.file, { "se-interval": 99, title: "pending edit" });
+	const persist = harness.plugin.app.fileManager.processFrontMatter;
+	harness.plugin.app.fileManager.processFrontMatter = async () => { throw new Error("disk full"); };
+	harness.answerSuggester("Unfruitful");
+	await harness.plugin.logReviewOutcome();
+	assert.equal(harness.frontmatter["se-interval"], 7);
+	harness.plugin.app.fileManager.processFrontMatter = persist;
+	await harness.plugin.processFrontmatterQueue();
+	assert.equal(harness.frontmatter["se-interval"], 99);
+	assert.equal(harness.frontmatter.title, "pending edit");
 });

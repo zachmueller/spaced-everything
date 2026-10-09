@@ -267,6 +267,11 @@ function createPluginHarness({
 	// plugin.processFrontmatterQueue() run for real and the call sites that reach
 	// past them are covered too.
 	plugin.frontmatterQueue = {
+		discardFields: (target, fields) => {
+			for (const entry of queued.slice(flushed)) {
+				if (entry.file.path === target.path) for (const field of fields) delete entry.updates[field];
+			}
+		},
 		add: (target, updates) => {
 			queued.push({ file: target, updates });
 		},
@@ -289,6 +294,7 @@ function createPluginHarness({
 		const { FrontmatterQueue } = loadModule("src/frontmatterQueue.ts", { obsidian });
 		const queue = new FrontmatterQueue(plugin.app);
 		plugin.frontmatterQueue = {
+			discardFields: (target, fields) => queue.discardFields(target, fields),
 			add: (target, updates) => {
 				queued.push({ file: target, updates });
 				queue.add(target, updates);

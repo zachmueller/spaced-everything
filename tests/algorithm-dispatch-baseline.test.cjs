@@ -1,7 +1,7 @@
 /**
- * What a spacing method's `spacingAlgorithm` setting does to a review, as shipped today.
+ * Legacy spacingAlgorithm behavior that must survive the introduction of custom scripts.
  *
- * Short answer: nothing. updateInterval() always calls superMemo(), whatever the
+ * Before #36, updateInterval() always called superMemo(), whatever the
  * method's algorithm says. The settings dropdown has offered "Custom script"
  * since the spacing-methods refactor (b258973), with the script field disabled
  * and marked not implemented, so a vault can already contain methods saved as
@@ -17,14 +17,16 @@ const assert = require("node:assert/strict");
 
 const { createPluginHarness, defaultSpacingMethod } = require("./helpers/harness.cjs");
 
+const FALLBACK_NOTICE = "Using SuperMemo 2.0 for a legacy spacing method with no custom script or an unknown algorithm. Check spacing method settings.";
+
 const TIMESTAMP = "2026-01-01T12:00:00Z";
 
 /** The SuperMemo result for interval 7, ease 2.5, score 5 (see scheduling-baseline). */
 const SUPERMEMO_7_25_5 = { newInterval: 18.2, newEaseFactor: 2.6 };
 
-test("every stored spacingAlgorithm value schedules with SuperMemo today", async () => {
+test("legacy spacingAlgorithm values without a configured script still schedule with SuperMemo", async () => {
 	// Recorded, not endorsed: `Custom` with no script, a misspelling, and a missing
-	// value all silently get SuperMemo. 'SuperMemo 2.0' (with a space) is the id
+	// value all historically got SuperMemo. 'SuperMemo 2.0' (with a space) is the id
 	// used in the src/types.ts doc example; the dropdown saves 'SuperMemo2.0'.
 	for (const spacingAlgorithm of ["SuperMemo2.0", "Custom", "SuperMemo 2.0", undefined, "", "typo"]) {
 		const harness = createPluginHarness({ frontmatter: { "se-interval": 7, "se-ease": 2.5 } });
@@ -35,7 +37,8 @@ test("every stored spacingAlgorithm value schedules with SuperMemo today", async
 			SUPERMEMO_7_25_5,
 			`spacingAlgorithm ${JSON.stringify(spacingAlgorithm)} should schedule with SuperMemo`,
 		);
-		assert.deepEqual(harness.notices, ["Interval updated from 7 to 18.2"]);
+		// Behavior change (#36): preserve legacy scheduling but explain the fallback once per plugin session.
+		assert.deepEqual(harness.notices, [...(spacingAlgorithm === "SuperMemo2.0" ? [] : [FALLBACK_NOTICE]), "Interval updated from 7 to 18.2"]);
 	}
 });
 
@@ -61,7 +64,8 @@ test("a note on a Custom method with no script is reviewed like any other", asyn
 	assert.equal(harness.frontmatter["se-ease"], 2.6);
 	assert.match(String(harness.frontmatter["se-last-reviewed"]), /^\d{4}-\d{2}-\d{2}T/);
 	assert.equal(harness.frontmatter["se-method"], "Custom method");
-	assert.deepEqual(harness.notices, ["Interval updated from 7 to 18.2"]);
+	// Behavior change (#36): an unconfigured legacy Custom method now receives a fallback notice.
+	assert.deepEqual(harness.notices, [FALLBACK_NOTICE, "Interval updated from 7 to 18.2"]);
 });
 
 test("loadSettings does not migrate a saved method's spacingAlgorithm", async () => {
@@ -83,4 +87,13 @@ test("loadSettings does not migrate a saved method's spacingAlgorithm", async ()
 	assert.equal(loadedLegacy.spacingAlgorithm, undefined);
 	assert.equal(loadedCustom.spacingAlgorithm, "Custom");
 	assert.equal(loadedCustom.customScriptFileName, "");
+});
+
+test("legacy fallback warns only once per plugin session", async () => {
+	const harness = createPluginHarness({ frontmatter: { "se-interval": 7, "se-ease": 2.5 } });
+	for (const spacingAlgorithm of ["Custom", "typo", undefined]) {
+		await harness.plugin.updateInterval(harness.file, {}, 5, TIMESTAMP, defaultSpacingMethod({ spacingAlgorithm }));
+	}
+	assert.equal(harness.notices.filter(n => n === FALLBACK_NOTICE).length, 1);
+	assert.equal(harness.notices.filter(n => n.startsWith("Interval updated")).length, 3);
 });

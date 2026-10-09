@@ -123,8 +123,10 @@ export interface SpacingMethod {
 	/**
 	 * Algorithm identifier
 	 * 
-	 * Selects 'SuperMemo2.0' or 'Custom'. Unknown identifiers are rejected
-	 * at review time rather than silently falling back to another algorithm.
+	 * Selects 'SuperMemo2.0' or 'Custom'. A missing or unknown identifier, or
+	 * 'Custom' with no script path, schedules with SuperMemo and shows a notice
+	 * once per plugin session, for compatibility with methods saved before
+	 * custom scripts existed.
 	 */
 	spacingAlgorithm: string;
 
